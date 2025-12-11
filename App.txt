@@ -1,0 +1,1107 @@
+/*************************************************************** 
+ * ui.js – interfaccia e orchestrazione
+ * Requisiti:
+ * - LC Past/Mid/Current sempre calcolati; Past/Mid OFF di default, Current ON.
+ * - Toggle “Exclude WDPA (Protected Areas)” DISATTIVO di default.
+ * - Wetlands escluse di default, abilitate solo in modalità “ARR (Mangroves)”.
+ * - CHM ETH 2020 sempre attivo per ARR / ARR (Mangroves) con soglia default (10 m) in Landcover;
+ *   da qui si può solo impostare una soglia custom opzionale.
+ * - Applicability FULL: 0 = not, 2 = applicable, 3 = potentially applicable (deforested F→NF).
+ *   Il 3 è visualizzato solo per ARR / ARR (Mangroves); per gli altri progetti la logica è
+ *   calcolata ma non mostrata nei layer/grafici (bloccato via flag in questa UI).
+ * - Al click su “Apply applicability conditions” i layer LC vengono spenti (non riaggiunti) per ridurre carico.
+ * - Summary: ha applicabili, non applicabili, (potenzialmente applicabili per ARR/Mangroves) e totale, con percentuali.
+ * - Export raster (LC e Applicability) e CSV robusti.
+ ***************************************************************/
+
+var ColorsLegends = require('users/andreagonnelli06/southpole:UI_IPA/Colors&Legends');
+var Landcover     = require('users/andreagonnelli06/southpole:UI_IPA/Landcover');
+var Eligibility   = require('users/andreagonnelli06/southpole:UI_IPA/Condition');
+var SecondaryData = require('users/andreagonnelli06/southpole:UI_IPA/Sec_data');
+
+var UI = (function () {
+  // ===== Stato =====
+  var _state = {
+    aoi: null,
+    years: null,              // ee (past/mid/curr)
+    yearsLabel: null,         // {past:int, mid:int, curr:int} client
+    lc: null,                 // {past, mid, curr}
+    masks: null,
+    stability: null,
+    lastApplicability: null,  // {full, mid, potential, stable_*}
+    lastProject: null,
+    excludeWDPA: false
+  };
+
+  // ===== UI widgets =====
+  var map, leftPanel, rightPanel, summaryPanel, chartsPanel, exportPanel;
+  var yearBox, spanBox, aoiMode, geojsonArea, projSelect;
+  var runBtn, applyBtn, wdpaCk;
+  var chmCustomCk, chmText, chmPanel;
+  var secCollapsible = null;
+
+  // Riferimenti Layer
+  var layersRef = {
+    lcPast:null, lcMid:null, lcCurr:null,
+    stableF:null, stableNF:null, defor:null, refor:null, excl:null,
+    applFull:null, applMid:null
+  };
+
+  function _add(lyr){ map.layers().add(lyr); }
+  function _rm(ref){ if(ref){ try{ map.layers().remove(ref);}catch(e){} } }
+
+  // ===== Collapsible container =====
+  function makeCollapsible(title, innerPanel, defaultOpen){
+    var container = ui.Panel();
+    var chk = ui.Checkbox({
+      label:title,
+      value: !!defaultOpen,
+      style:{fontWeight:'bold', margin:'8px 0 4px 0'}
+    });
+    var box = ui.Panel({
+      style:{
+        margin:'0 0 8px 8px',
+        padding:'6px',
+        border:'1px dashed #bbb',
+        backgroundColor:'#fcfcfc'
+      }
+    });
+    box.style().set('shown', !!defaultOpen);
+    chk.onChange(function(v){ box.style().set('shown', v); });
+    box.add(innerPanel);
+    container.add(chk);
+    container.add(box);
+    return container;
+  }
+
+  // ===== Intro box =====
+  function buildIntroPanel() {
+    var p = ui.Panel({
+      style:{
+        margin:'0 0 10px 0',
+        padding:'10px',
+        border:'1px solid #ddd',
+        backgroundColor:'#fff'
+      }
+    });
+    function h(t){ return ui.Label(t, {fontWeight:'bold', fontSize:'13px', margin:'6px 0 4px 0'}); }
+    function tx(t){ return ui.Label(t, {fontSize:'12px', color:'#444', margin:'2px 0'}); }
+
+    p.add(h('Procedure overview'));
+    p.add(tx('Objective of the tool: assess if the AOI is applicable for a methodology. Approach is a "pre-eligibility" one: minimum requirements, enough for an initial quick assessment.'));
+    p.add(tx('AOI: can be a project area, a buffer area, a jurisdiction or region, or generic area. Draw the AOI manually or give the geometry description in GeoJSON format.'));
+
+    p.add(h('Applicability rules'));
+    p.add(tx('• ARR: area stable non-forest over the historical period, exclusions applied; water, cropland and urban areas are excluded in addition.'));
+    p.add(tx('• REDD+ / IFM: area stable forest over the historical period, exclusions applied.'));
+    p.add(tx('• ALM: stable grass/shrub/crops over the historical period, exclusions applied.'));
+    p.add(tx('• ARR (Mangroves): ARR logic constrained to mangrove mask; wetlands not excluded.'));
+
+    p.add(h('Exclusions'));
+    p.add(tx('GRIP4 roads (5 m buffer), HydroSHEDS rivers (30 m), JRC water ≥60%, GWL_FCS30 wetlands, WDPA (toggle), Built (50 m buffer).'));
+    return p;
+  }
+
+  // ===== AOI =====
+  function getAOI() {
+    var mode = aoiMode.getValue();
+
+    if (mode === 'Draw on map') {
+      var d = map.drawingTools();
+      if (d.layers().length() === 0) return null;
+      var geom = d.layers().get(0).getEeObject();
+      if (!geom) return null;
+      return ee.Geometry(geom).dissolve(1);
+    }
+
+    // GeoJSON
+    var txt = geojsonArea.getValue();
+    if (!txt || txt.trim() === '') return null;
+
+    var parsed;
+    try { parsed = JSON.parse(txt); }
+    catch (e) { throw new Error('Invalid GeoJSON: ' + e); }
+
+    function fcFromGeoJSON(obj) {
+      var feats = [];
+      if (obj.type === 'FeatureCollection') {
+        feats = obj.features || [];
+      } else if (obj.type === 'Feature') {
+        feats = [obj];
+      } else {
+        feats = [{ type: 'Feature', geometry: obj, properties: {} }];
+      }
+
+      var eeFeats = feats.map(function (f) {
+        var g = ee.Geometry(f.geometry, null, false);
+        return ee.Feature(g);
+      });
+
+      return ee.FeatureCollection(eeFeats);
+    }
+
+    if (parsed.type === 'FeatureCollection' || parsed.type === 'Feature') {
+      var fc = fcFromGeoJSON(parsed);
+      return fc.geometry().dissolve(1);
+    }
+
+    if (parsed.type === 'Polygon' || parsed.type === 'MultiPolygon' ||
+        parsed.type === 'Point'   || parsed.type === 'MultiPoint'   ||
+        parsed.type === 'LineString' || parsed.type === 'MultiLineString') {
+      return ee.Geometry(parsed).dissolve(1);
+    }
+
+    throw new Error('Unsupported GeoJSON type: ' + parsed.type);
+  }
+
+  function clearOutputs(){
+    summaryPanel.clear();
+    chartsPanel.clear();
+    exportPanel.clear();
+    exportPanel.add(ui.Label('Export to Drive', {fontWeight:'bold'}));
+  }
+
+  // ===== LC base =====
+  function addBaseLC(){
+    _rm(layersRef.lcPast); _rm(layersRef.lcMid); _rm(layersRef.lcCurr);
+    var pastLbl = 'LC Past (' + _state.yearsLabel.past + ')';
+    var midLbl  = 'LC Mid ('  + _state.yearsLabel.mid  + ')';
+    var curLbl  = 'LC Current ('+ _state.yearsLabel.curr + ')';
+    layersRef.lcPast = ui.Map.Layer(
+      Landcover.lcForDisplay(_state.lc.past, _state.aoi),
+      ColorsLegends.LC_VIS_MAP, pastLbl, false, 1.0
+    );
+    layersRef.lcMid  = ui.Map.Layer(
+      Landcover.lcForDisplay(_state.lc.mid,  _state.aoi),
+      ColorsLegends.LC_VIS_MAP, midLbl,  false, 1.0
+    );
+    layersRef.lcCurr = ui.Map.Layer(
+      Landcover.lcForDisplay(_state.lc.curr, _state.aoi),
+      ColorsLegends.LC_VIS_MAP, curLbl,  true,  1.0
+    );
+    _add(layersRef.lcPast); _add(layersRef.lcMid); _add(layersRef.lcCurr);
+  }
+
+  // ===== Overlays =====
+  var ckStableF, ckStableNF, ckDefor, ckRefor, ckExcl;
+  function buildOverlayPanel(){
+    var overlaysPanel = ui.Panel({
+      style:{
+        margin:'10px 0',
+        padding:'8px',
+        border:'1px solid #ddd',
+        backgroundColor:'#fff'
+      }
+    });
+    overlaysPanel.add(ui.Label('Overlays (stability / exclusions / transitions)', {fontWeight:'bold'}));
+    ckStableF  = ui.Checkbox({label:'Stable Forest (full-span)', value:false});
+    ckStableNF = ui.Checkbox({label:'Stable Non-Forest (full-span)', value:false});
+    ckDefor    = ui.Checkbox({label:'Deforestation (F→NF)', value:false});
+    ckRefor    = ui.Checkbox({label:'Reforestation (NF→F)', value:false});
+    ckExcl     = ui.Checkbox({label:'Exclusions (from Current LC)', value:false});
+    overlaysPanel.add(ckStableF);
+    overlaysPanel.add(ckStableNF);
+    overlaysPanel.add(ckDefor);
+    overlaysPanel.add(ckRefor);
+    overlaysPanel.add(ckExcl);
+
+    ckStableF.onChange(refreshStabilityToggles);
+    ckStableNF.onChange(refreshStabilityToggles);
+    ckDefor.onChange(refreshStabilityToggles);
+    ckRefor.onChange(refreshStabilityToggles);
+    ckExcl.onChange(refreshStabilityToggles);
+    return overlaysPanel;
+  }
+
+  function refreshStabilityToggles(){
+    if (!_state || !_state.stability) return;
+    _rm(layersRef.stableF); _rm(layersRef.stableNF); _rm(layersRef.defor); _rm(layersRef.refor); _rm(layersRef.excl);
+
+    if (ckStableF.getValue()){
+      layersRef.stableF = ui.Map.Layer(
+        _state.stability.stableF,
+        ColorsLegends.STABLE_FOREST_VIS,
+        'Stable Forest (full-span)', true, 0.9
+      ); _add(layersRef.stableF);
+    }
+    if (ckStableNF.getValue()){
+      layersRef.stableNF = ui.Map.Layer(
+        _state.stability.stableNF,
+        ColorsLegends.STABLE_NONFOREST_VIS,
+        'Stable Non-Forest (full-span)', true, 0.9
+      ); _add(layersRef.stableNF);
+    }
+    if (ckDefor.getValue()){
+      layersRef.defor = ui.Map.Layer(
+        _state.stability.deforest,
+        ColorsLegends.DEFOREST_VIS,
+        'Deforestation (F→NF)', true, 0.9
+      ); _add(layersRef.defor);
+    }
+    if (ckRefor.getValue()){
+      layersRef.refor = ui.Map.Layer(
+        _state.stability.reforest,
+        ColorsLegends.REFOREST_VIS,
+        'Reforestation (NF→F)', true, 0.9
+      ); _add(layersRef.refor);
+    }
+    if (ckExcl.getValue()){
+      layersRef.excl  = ui.Map.Layer(
+        _state.stability.excl,
+        ColorsLegends.EXCLUSIONS_VIS,
+        'Exclusions (from Current LC)', true, 0.9
+      ); _add(layersRef.excl);
+    }
+  }
+
+  // ===== INIT =====
+  function init(){
+    map = ui.Map();
+    map.setOptions('SATELLITE');
+    leftPanel  = ui.Panel({style:{width:'460px', padding:'10px', backgroundColor:'#fafafa', borderStyle:'1px solid #ddd'}});
+    rightPanel = ui.Panel({style:{stretch:'both', padding:'0'}});
+    ui.root.clear();
+    ui.root.add(ui.SplitPanel({
+      firstPanel:leftPanel,
+      secondPanel:rightPanel,
+      orientation:'horizontal',
+      wipe:false
+    }));
+    rightPanel.add(map);
+
+    leftPanel.add(buildIntroPanel());
+
+    // Settings
+    var settingsPanel = ui.Panel({
+      style:{
+        margin:'10px 0',
+        padding:'8px',
+        border:'1px solid #ddd',
+        backgroundColor:'#fff'
+      }
+    });
+    settingsPanel.add(ui.Label('Settings',{fontWeight:'bold'}));
+    yearBox=ui.Textbox({placeholder:'Project start year', value:'2023', style:{stretch:'horizontal'}});
+    spanBox=ui.Textbox({placeholder:'Historical period (years)', value:'10', style:{stretch:'horizontal'}});
+    aoiMode=ui.Select({items:['Draw on map','GeoJSON (paste)'], value:'Draw on map', style:{stretch:'horizontal'}});
+    geojsonArea=ui.Textbox({placeholder:'Paste compact GeoJSON (single line)', value:'', style:{stretch:'horizontal'}});
+    projSelect = ui.Select({
+      items:['ARR','REDD+','IFM','ALM','ARR (Mangroves)'],
+      value:'ARR',
+      style:{stretch:'horizontal'}
+    });
+
+    // CHM controls: sempre ON in Landcover; qui solo soglia custom opzionale
+    chmCustomCk = ui.Checkbox({
+      label:'Use custom CHM threshold (m)',
+      value:false,
+      style:{stretch:'horizontal', margin:'6px 0 0 0'}
+    });
+    chmText = ui.Textbox({
+      placeholder:'CHM threshold (m)',
+      value:'',
+      style:{stretch:'horizontal', margin:'2px 0 0 18px'}
+    });
+    chmText.setDisabled(true);
+    chmCustomCk.onChange(function(v){ chmText.setDisabled(!v); });
+
+    chmPanel = ui.Panel(
+      [chmCustomCk, chmText],
+      ui.Panel.Layout.flow('vertical'),
+      {margin:'4px 0 0 0'}
+    );
+
+    function _updateCHMpanelVisibility(){
+      var v = projSelect.getValue();
+      var show = (v === 'ARR' || v === 'ARR (Mangroves)');
+      chmPanel.style().set('shown', show);
+      if (!show){
+        chmCustomCk.setValue(false);
+        chmText.setDisabled(true);
+      }
+    }
+    projSelect.onChange(function(){ _updateCHMpanelVisibility(); });
+    _updateCHMpanelVisibility();
+
+    // WDPA toggle
+    wdpaCk = ui.Checkbox({
+      label:'Exclude WDPA (Protected Areas)',
+      value:false,
+      style:{stretch:'horizontal', margin:'6px 0 0 0'}
+    });
+    _state.excludeWDPA = false;
+    wdpaCk.onChange(function(v){ _state.excludeWDPA = !!v; });
+
+    runBtn  = ui.Button({
+      label:'Run LC analysis',
+      style:{stretch:'horizontal', margin:'6px 0', backgroundColor:'#ffffff', color:'#000000', border:'1px solid #ccc'}
+    });
+    applyBtn= ui.Button({
+      label:'Apply applicability conditions',
+      style:{stretch:'horizontal', margin:'6px 0', backgroundColor:'#ffffff', color:'#000000', border:'1px solid #ccc'}
+    });
+
+    settingsPanel.add(ui.Panel([
+      ui.Label('Project start year'), yearBox,
+      ui.Label('Historical period (years)'), spanBox
+    ], ui.Panel.Layout.flow('vertical')));
+    settingsPanel.add(ui.Panel([
+      ui.Label('AOI mode'), aoiMode,
+      ui.Label('GeoJSON (if selected)'), geojsonArea
+    ], ui.Panel.Layout.flow('vertical')));
+    settingsPanel.add(ui.Label('Project type',{fontWeight:'bold', margin:'6px 0 0 0'}));
+    settingsPanel.add(projSelect);
+    settingsPanel.add(chmPanel);
+    settingsPanel.add(wdpaCk);
+    settingsPanel.add(runBtn);
+    settingsPanel.add(applyBtn);
+    leftPanel.add(settingsPanel);
+
+    // Overlays
+    leftPanel.add(ui.Label('Overlays',{fontWeight:'bold', margin:'0 0 4px 0'}));
+    leftPanel.add(buildOverlayPanel());
+
+    // Summary & Charts
+    summaryPanel = ui.Panel({style:{margin:'10px 0', padding:'8px', border:'1px solid #ddd', backgroundColor:'#fff'}});
+    chartsPanel  = ui.Panel({style:{margin:'10px 0', padding:'8px', border:'1px solid #ddd', backgroundColor:'#fff'}});
+    leftPanel.add(ui.Label('Summary',{fontWeight:'bold', margin:'0 0 4px 0'}));
+    leftPanel.add(summaryPanel);
+    leftPanel.add(ui.Label('Charts',{fontWeight:'bold', margin:'0 0 4px 0'}));
+    leftPanel.add(chartsPanel);
+
+    // Export panel
+    exportPanel = ui.Panel({
+      style:{
+        position:'bottom-right',
+        padding:'8px',
+        backgroundColor:'rgba(255,255,255,0.95)',
+        border:'1px solid #ddd',
+        width:'320px'
+      }
+    });
+    exportPanel.add(ui.Label('Export to Drive', {fontWeight:'bold'}));
+    map.add(exportPanel);
+
+    // Drawing tools
+    var dt = map.drawingTools();
+    dt.setShown(true);
+    if (dt.layers().length() === 0) {
+      dt.layers().add(ui.Map.GeometryLayer({geometries: [], name: 'AOI'}));
+    }
+    dt.setDrawModes(['polygon','rectangle']);
+
+    runBtn.onClick(runAnalysis);
+    applyBtn.onClick(applyEligibility);
+  }
+
+  // ===== RUN ANALYSIS =====
+  function runAnalysis(){
+    clearOutputs();
+    _state.lastApplicability = null;
+    _state.lastProject = null;
+
+    var currentYearClient = parseInt(yearBox.getValue(),10);
+    var spanClient        = parseInt(spanBox.getValue(),10);
+    if (!(currentYearClient>=2000 && spanClient>=1 && spanClient<=30)){
+      summaryPanel.add(ui.Label('Invalid parameters. Year≥2000, 1≤historical period≤30.', {color:'#b00020'}));
+      return;
+    }
+    var aoi;
+    try { aoi=getAOI(); }
+    catch(e){
+      summaryPanel.add(ui.Label(String(e),{color:'#b00020'}));
+      return;
+    }
+    if (!aoi){
+      summaryPanel.add(ui.Label('Define an AOI (drawing or GeoJSON).',{color:'#b00020'}));
+      return;
+    }
+
+    var pastY = currentYearClient - spanClient;
+    var half  = Math.max(1, Math.min(spanClient-1, Math.round(spanClient/2)));
+    var midY  = pastY + half;
+    _state.yearsLabel = { past: pastY, mid: midY, curr: currentYearClient };
+
+    var sel = projSelect.getValue();
+
+    // Wetlands exclude di default; per ARR (Mangroves) non vengono esclusi
+    var disableWetlands = (sel === 'ARR (Mangroves)') ? false : true;
+
+    var excludeWDPA = !!_state.excludeWDPA;
+
+    // CHM threshold override opzionale
+    var chmThr = null;
+    if (sel === 'ARR' || sel === 'ARR (Mangroves)') {
+      if (chmCustomCk.getValue()) {
+        var chmStr = chmText.getValue();
+        var chmVal = parseFloat(chmStr);
+        if (!isFinite(chmVal) || chmVal <= 0 || chmVal > 80) {
+          summaryPanel.add(ui.Label('Invalid CHM threshold (m). Use a positive value up to 80.', {color:'#b00020'}));
+          return;
+        }
+        chmThr = chmVal;
+      } else {
+        chmThr = null; // default (10 m) gestito in Landcover
+      }
+    }
+
+    var pack = Landcover.buildLCs(
+      aoi,
+      ee.Number(currentYearClient),
+      ee.Number(spanClient),
+      disableWetlands,
+      excludeWDPA,
+      sel,
+      chmThr
+    );
+    _state.aoi = aoi;
+    _state.years = pack.years;
+    _state.lc = pack.lc;
+    _state.masks = pack.masks;
+    _state.stability = Landcover.buildStabilityLayers(_state.lc.past, _state.lc.curr, aoi);
+
+    map.layers().reset([]);
+    map.centerObject(aoi,10);
+    addBaseLC();
+
+    // Secondary data
+    if (secCollapsible){
+      try{ leftPanel.remove(secCollapsible); }catch(e){}
+      secCollapsible = null;
+    }
+    SecondaryData.init(aoi, map);
+    var secPanel = SecondaryData.buildPanel();
+    secCollapsible = makeCollapsible(
+      'Secondary Data (SRTM / Biomes / Ecoregions / IPCC Soils)',
+      secPanel,
+      false
+    );
+    leftPanel.add(secCollapsible);
+
+    // Chart LC current
+    var areasCurr = Landcover.areasListByClass(_state.lc.curr, aoi, Landcover.SCALE_LC);
+    var labelsEE = ee.List(ColorsLegends.CLASS_ORDER.map(function(c){return ColorsLegends.CLASS_NAMES[c];}));
+    var histChart = ui.Chart.array.values({
+        array:ee.Array(areasCurr), axis:0, xLabels:labelsEE
+      })
+      .setChartType('ColumnChart')
+      .setOptions({
+        title:'LC Current (ha)',
+        legend:{position:'none'},
+        colors:ColorsLegends.classPalette,
+        hAxis:{title:'Classes', slantedText:true, slantedTextAngle:30, textStyle:{fontSize:11}},
+        vAxis:{title:'Hectares (ha)', viewWindow:{min:0}, textStyle:{fontSize:11}},
+        bar:{groupWidth:'70%'},
+        annotations:{alwaysOutside:true, textStyle:{fontSize:10}},
+        titleTextStyle:{fontSize:14, bold:true},
+        width:360, height:220
+      });
+    chartsPanel.clear();
+    chartsPanel.add(histChart);
+
+    // Export LC raster
+    function addExportButton(label, img, region, scale, description){
+      var btn = ui.Button({
+        label: label,
+        style:{margin:'4px 0', backgroundColor:'#ffffff', color:'#000000', width:'100%'}
+      });
+      btn.onClick(function(){
+        Export.image.toDrive({
+          image: img.clip(region).toInt16(),
+          description: description,
+          fileNamePrefix: description,
+          region: region,
+          scale: scale,
+          maxPixels: Landcover.MAX_PIXELS,
+          fileFormat: 'GeoTIFF'
+        });
+      });
+      exportPanel.add(btn);
+    }
+    exportPanel.add(ui.Label('— LC rasters —'));
+    addExportButton('Export LC Past (GeoTIFF)',    _state.lc.past, aoi, Landcover.SCALE_LC, 'LC_PAST_'+_state.yearsLabel.past);
+    addExportButton('Export LC Mid (GeoTIFF)',     _state.lc.mid,  aoi, Landcover.SCALE_LC, 'LC_MID_'+_state.yearsLabel.mid);
+    addExportButton('Export LC Current (GeoTIFF)', _state.lc.curr, aoi, Landcover.SCALE_LC, 'LC_CURRENT_'+_state.yearsLabel.curr);
+
+    ColorsLegends.renderLegends(map);
+  }
+
+  // ===== APPLY ELIGIBILITY / APPLICABILITY =====
+  function applyEligibility(){
+    if (!_state.aoi || !_state.lc){
+      summaryPanel.add(ui.Label('Run LC analysis first.',{color:'#b00020'}));
+      return;
+    }
+    var project = projSelect.getValue();
+
+    var out = Eligibility.computeApplicabilitySplit(_state, project);
+    _state.lastApplicability = out;
+    _state.lastProject = project;
+
+    map.centerObject(_state.aoi,10);
+
+    var showPotential = (project === 'ARR' || project === 'ARR (Mangroves)');
+
+    // Applicability layers
+    var fullLabel = showPotential
+      ? 'Applicability — Full span (0/2/3)'
+      : 'Applicability — Full span (0/2)';
+    layersRef.applFull = ui.Map.Layer(
+      out.full.clip(_state.aoi),
+      ColorsLegends.APPL_FULL_VIS,
+      fullLabel,
+      true,
+      ColorsLegends.APPL_OPACITY
+    );
+    layersRef.applMid  = ui.Map.Layer(
+      out.mid.clip(_state.aoi),
+      ColorsLegends.APPL_MID_VIS,
+      'Applicability — Mid year (0/1)',
+      false,
+      ColorsLegends.APPL_OPACITY
+    );
+    _add(layersRef.applFull);
+    _add(layersRef.applMid);
+
+    // Overlays ricalcolati ma NON accesi
+    _state.stability = Landcover.buildStabilityLayers(_state.lc.past, _state.lc.curr, _state.aoi);
+    refreshStabilityToggles();
+
+    // Sommario + grafici
+    var ha = ee.Image.pixelArea().divide(10000);
+    var f2 = ha.updateMask(out.full.eq(2)).reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry:_state.aoi,
+      scale:Landcover.SCALE_LC,
+      maxPixels:Landcover.MAX_PIXELS,
+      bestEffort:true
+    }).get('area');
+    var f0 = ha.updateMask(out.full.eq(0)).reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry:_state.aoi,
+      scale:Landcover.SCALE_LC,
+      maxPixels:Landcover.MAX_PIXELS,
+      bestEffort:true
+    }).get('area');
+    var f3 = ha.updateMask(out.full.eq(3)).reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry:_state.aoi,
+      scale:Landcover.SCALE_LC,
+      maxPixels:Landcover.MAX_PIXELS,
+      bestEffort:true
+    }).get('area');
+
+    var m1 = ha.updateMask(out.mid.eq(1)).reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry:_state.aoi,
+      scale:Landcover.SCALE_LC,
+      maxPixels:Landcover.MAX_PIXELS,
+      bestEffort:true
+    }).get('area');
+    var m0 = ha.updateMask(out.mid.eq(0)).reduceRegion({
+      reducer: ee.Reducer.sum(),
+      geometry:_state.aoi,
+      scale:Landcover.SCALE_LC,
+      maxPixels:Landcover.MAX_PIXELS,
+      bestEffort:true
+    }).get('area');
+
+    ee.Dictionary({f2:f2,f0:f0,f3:f3,m1:m1,m0:m0}).evaluate(function(d){
+      summaryPanel.clear();
+
+      var appHa   = (d && d.f2) || 0;
+      var notHa   = (d && d.f0) || 0;
+      var potHa   = (d && d.f3) || 0;
+
+      var totalHa = appHa + notHa + potHa;
+      var pApp = totalHa > 0 ? (appHa / totalHa) * 100 : 0;
+      var pNot = totalHa > 0 ? (notHa / totalHa) * 100 : 0;
+      var pPot = totalHa > 0 ? (potHa / totalHa) * 100 : 0;
+
+      summaryPanel.add(ui.Label('AOI total (ha): ' + Math.round(totalHa).toLocaleString(), {fontSize:'12px'}));
+      summaryPanel.add(ui.Label('Applicable — Full span (2): ' + Math.round(appHa).toLocaleString() + ' ha (' + pApp.toFixed(1) + '%)', {fontSize:'12px'}));
+      if (showPotential) {
+        summaryPanel.add(ui.Label('Potentially applicable — Full span (3, deforested): ' +
+          Math.round(potHa).toLocaleString() + ' ha (' + pPot.toFixed(1) + '%)', {fontSize:'12px'}));
+      }
+      summaryPanel.add(ui.Label('Not applicable — Full span (0): ' + Math.round(notHa).toLocaleString() + ' ha (' + pNot.toFixed(1) + '%)', {fontSize:'12px'}));
+
+      var nf0 = Math.round(notHa),
+          nf2 = Math.round(appHa),
+          nf3 = Math.round(potHa);
+      var nm0 = Math.round(((d && d.m0) || 0)),
+          nm1 = Math.round(((d && d.m1) || 0));
+
+      // Pie FULL
+      var pieF;
+      if (showPotential) {
+        var labelsF = ee.List(['Not applicable','Applicable','Potentially applicable']);
+        var valuesF = ee.List([nf0, nf2, nf3]);
+        var colorsF = [
+          ColorsLegends.APPL_FULL_VIS.palette[0],
+          ColorsLegends.APPL_FULL_VIS.palette[2],
+          ColorsLegends.APPL_FULL_VIS.palette[3]
+        ];
+        pieF = ui.Chart.array.values({
+            array:ee.Array(valuesF), axis:0, xLabels:labelsF
+          })
+          .setChartType('PieChart')
+          .setOptions({
+            title:'Full span split (0/2/3)',
+            pieHole:0.35,
+            sliceVisibilityThreshold:0,
+            legend:{position:'right'},
+            width:360, height:220,
+            colors:colorsF
+          });
+      } else {
+        var labelsF2 = ee.List(['Not applicable','Applicable']);
+        var valuesF2 = ee.List([nf0, nf2]);
+        pieF = ui.Chart.array.values({
+            array:ee.Array(valuesF2), axis:0, xLabels:labelsF2
+          })
+          .setChartType('PieChart')
+          .setOptions({
+            title:'Full span split (0/2)',
+            pieHole:0.35,
+            sliceVisibilityThreshold:0,
+            legend:{position:'right'},
+            width:360, height:220,
+            colors:[
+              ColorsLegends.APPL_FULL_VIS.palette[0],
+              ColorsLegends.APPL_FULL_VIS.palette[2]
+            ]
+          });
+      }
+
+      // Pie MID (0/1) invariato
+      var labelsM = ee.List(['Not applicable','Stable (<5y)']);
+      var valuesM = ee.List([nm0, nm1]);
+      var pieM = ui.Chart.array.values({
+          array:ee.Array(valuesM), axis:0, xLabels:labelsM
+        })
+        .setChartType('PieChart')
+        .setOptions({
+          title:'Mid year split (0/1)',
+          pieHole:0.35,
+          sliceVisibilityThreshold:0,
+          legend:{position:'right'},
+          width:360, height:220,
+          colors:[
+            ColorsLegends.APPL_MID_VIS.palette[0],
+            ColorsLegends.APPL_MID_VIS.palette[1]
+          ]
+        });
+
+      chartsPanel.clear();
+      chartsPanel.add(pieF);
+      chartsPanel.add(pieM);
+
+      // Export Applicability rasters
+      function addExportButton(label, img, region, scale, description){
+        var btn = ui.Button({
+          label: label,
+          style:{margin:'4px 0', backgroundColor:'#ffffff', color:'#000000', width:'100%'}
+        });
+        btn.onClick(function(){
+          Export.image.toDrive({
+            image: img.clip(region).toInt16(),
+            description: description,
+            fileNamePrefix: description,
+            region: region,
+            scale: scale,
+            maxPixels: Landcover.MAX_PIXELS,
+            fileFormat: 'GeoTIFF'
+          });
+        });
+        exportPanel.add(btn);
+      }
+
+      exportPanel.add(ui.Label('— Applicability rasters —'));
+      var fullExportLabel = showPotential
+        ? 'Export Applicability — Full span (0/2/3)'
+        : 'Export Applicability — Full span (0/2)';
+      addExportButton(fullExportLabel, out.full, _state.aoi, Landcover.SCALE_LC,
+        'APPLICABILITY_FULL_'+project);
+      addExportButton('Export Applicability — Mid year (0/1)',  out.mid,  _state.aoi,
+        Landcover.SCALE_LC, 'APPLICABILITY_MID_'+project);
+
+      var csvBtn = ui.Button({
+        label:'Export CSV — Applicable & Not (FULL & MID) by classes + crosses',
+        style:{margin:'6px 0', backgroundColor:'#ffffff', color:'#000000', width:'100%'}
+      });
+      csvBtn.onClick(exportEligibleCSVs);
+      exportPanel.add(ui.Label('—'));
+      exportPanel.add(csvBtn);
+    });
+
+    ColorsLegends.renderLegends(map);
+  }
+
+  function _sanitizeSystemIndex(fc){
+    return ee.FeatureCollection(fc.map(function(f){
+      f = ee.Feature(f);
+      var keep = f.propertyNames().remove('system:index');
+      var props = f.toDictionary(keep);
+      return ee.Feature(f.geometry(), props);
+    }));
+  }
+
+  // ===== EXPORT CSV: applicabili vs non per classe/incrocio =====
+  function exportEligibleCSVs(){
+    if (!_state || !_state.aoi || !_state.lastApplicability){
+      summaryPanel.add(ui.Label('Esegui prima "Apply applicability conditions".', {color:'#b00020'}));
+      return;
+    }
+
+    var stacks = SecondaryData.getStacks();
+    var soilImg   = stacks.soilImg;
+    var biomeImg  = stacks.biomeImg;
+    var elevClass = stacks.elevClass;
+    var ecoFC     = _sanitizeSystemIndex(stacks.ecoFC);
+
+    var SOIL_NAME = SecondaryData.getSoilNameDict();
+    var BIOME_NAME= SecondaryData.getBiomeNameDict();
+    var EDGES_JS  = SecondaryData.getElevEdges() || [0,500,1000,1500,2000,2500,3000,3500,4000];
+    var EDGES     = ee.List(EDGES_JS);
+
+    var fullImg = _state.lastApplicability.full;
+    var midImg  = _state.lastApplicability.mid;
+
+    // Per chiudere i bilanci di area nel CSV:
+    //  - Eligible FULL = class 2
+    //  - Not FULL = class 0 OR class 3 (potentially applicable)
+    var fullMaskElig = fullImg.eq(2);
+    var fullMaskNot  = fullImg.eq(0).or(fullImg.eq(3));
+
+    var midMaskElig  = midImg.eq(1);
+    var midMaskNot   = midImg.eq(0);
+
+    var ha = ee.Image.pixelArea().divide(10000);
+
+    function soilName(v){
+      v = ee.Number(v);
+      var key = v.format();
+      return ee.String(ee.Algorithms.If(
+        SOIL_NAME.contains(key),
+        SOIL_NAME.get(key),
+        ''
+      ));
+    }
+    function biomeName(v){
+      v = ee.Number(v);
+      var key = v.format();
+      return ee.String(ee.Algorithms.If(
+        BIOME_NAME.contains(key),
+        BIOME_NAME.get(key),
+        ''
+      ));
+    }
+    function elevName(v){
+      v = ee.Number(v);
+      var n = EDGES.size();
+      var lower = ee.Number(EDGES.get(v.subtract(1)));
+      var isLast = v.gte(n);
+      var upper = ee.Number(ee.Algorithms.If(isLast, null, EDGES.get(v)));
+      return ee.String(ee.Algorithms.If(
+        isLast,
+        ee.String('≥ ').cat(lower.format()).cat(' m'),
+        ee.String(lower.format()).cat('-').cat(upper.format()).cat(' m')
+      ));
+    }
+
+    function reduceByClassDual(imgClass, maskElig, maskNot){
+      var areaE = ha.updateMask(maskElig);
+      var areaN = ha.updateMask(maskNot);
+      var img = ee.Image.cat(
+        areaE.rename('ha_e'),
+        areaN.rename('ha_n'),
+        imgClass.toInt().rename('cls')
+      );
+      var red = img.reduceRegion({
+        reducer: ee.Reducer.sum().repeat(2).group({groupField:1, groupName:'cls'}),
+        geometry: _state.aoi,
+        scale: Landcover.SCALE_LC,
+        maxPixels: Landcover.MAX_PIXELS,
+        bestEffort: true
+      });
+      var groups = ee.List(ee.Dictionary(red).get('groups', ee.List([])));
+      return groups;
+    }
+
+    function groupsToFC_Class(groups, idKey, nameFn, nameRequired){
+      var fc = ee.FeatureCollection(groups.map(function(g){
+        g = ee.Dictionary(g);
+        var cls  = ee.Number(g.get('cls')).toInt();
+        var sums = ee.List(g.get('sum'));
+        var haE  = ee.Number(sums.get(0));
+        var haN  = ee.Number(sums.get(1));
+        var nm   = nameFn(cls);
+        var cond = ee.Algorithms.If(nameRequired, nm.length().gt(0), true);
+        var props = ee.Dictionary({})
+          .set(idKey + '_value', cls)
+          .set(idKey + '_name',  nm)
+          .set('ha_full_eligible', haE)
+          .set('ha_full_not',      haN);
+        return ee.Algorithms.If(cond, ee.Feature(null, props), null);
+      })).filter(ee.Filter.notNull(['ha_full_eligible']));
+      return fc;
+    }
+
+    function attachMID(fc, imgClass, maskElig, maskNot, idKey){
+      var groups = reduceByClassDual(imgClass, maskElig, maskNot);
+      var dictMID = ee.Dictionary(ee.Algorithms.If(
+        groups.size(),
+        (function(){
+          var keys = groups.map(function(g){ return ee.Number(ee.Dictionary(g).get('cls')).format(); });
+          var sums = groups.map(function(g){ return ee.List(ee.Dictionary(g).get('sum')); });
+          var haE = ee.Dictionary.fromLists(
+            keys,
+            sums.map(function(s){ return ee.Number(ee.List(s).get(0)); })
+          );
+          var haN = ee.Dictionary.fromLists(
+            keys,
+            sums.map(function(s){ return ee.Number(ee.List(s).get(1)); })
+          );
+          return ee.Dictionary({'E':haE,'N':haN});
+        })(),
+        ee.Dictionary({'E':ee.Dictionary({}), 'N':ee.Dictionary({})})
+      ));
+      var haE = ee.Dictionary(dictMID.get('E'));
+      var haN = ee.Dictionary(dictMID.get('N'));
+      return fc.map(function(f){
+        f = ee.Feature(f);
+        var v = ee.Number(f.get(idKey + '_value')).format();
+        var midE = ee.Number(haE.get(v, 0));
+        var midN = ee.Number(haN.get(v, 0));
+        return f.set('ha_mid_eligible', midE)
+                .set('ha_mid_not',      midN);
+      });
+    }
+
+    function reduceByPairDual(imgA, imgB, maskElig, maskNot){
+      var A = imgA.toInt(), B = imgB.toInt();
+      var pair = A.multiply(10000).add(B).toInt();
+      var areaE = ha.updateMask(maskElig);
+      var areaN = ha.updateMask(maskNot);
+      var img = ee.Image.cat(
+        areaE.rename('ha_e'),
+        areaN.rename('ha_n'),
+        pair.rename('pair')
+      );
+      var red = img.reduceRegion({
+        reducer: ee.Reducer.sum().repeat(2).group({groupField:2, groupName:'pair'}),
+        geometry: _state.aoi,
+        scale: Landcover.SCALE_LC,
+        maxPixels: Landcover.MAX_PIXELS
+      });
+      var groups = ee.List(ee.Dictionary(
+        ee.Algorithms.If(red, red, ee.Dictionary({'groups': ee.List([])}))
+      ).get('groups', ee.List([])));
+      return groups;
+    }
+
+    function groupsToFC_Pair(groups, keyA, keyB, nameA, nameB, requireAName, requireBName){
+      var fc = ee.FeatureCollection(groups.map(function(g){
+        g = ee.Dictionary(g);
+        var code = ee.Number(g.get('pair')).toInt();
+        var aVal = code.divide(10000).floor().toInt();
+        var bVal = code.mod(10000).toInt();
+        var sums = ee.List(g.get('sum'));
+        var haE  = ee.Number(sums.get(0));
+        var haN  = ee.Number(sums.get(1));
+        var nmA  = nameA(aVal);
+        var nmB  = nameB(bVal);
+        var condA = ee.Algorithms.If(requireAName, nmA.length().gt(0), true);
+        var condB = ee.Algorithms.If(requireBName, nmB.length().gt(0), true);
+        var cond  = ee.Algorithms.If(condA, condB, false);
+        var props = ee.Dictionary({})
+          .set(keyA + '_value', aVal).set(keyA + '_name', nmA)
+          .set(keyB + '_value', bVal).set(keyB + '_name', nmB)
+          .set('ha_full_eligible', haE)
+          .set('ha_full_not',      haN);
+        return ee.Algorithms.If(cond, ee.Feature(null, props), null);
+      })).filter(ee.Filter.notNull(['ha_full_eligible']));
+      return fc;
+    }
+
+    function attachMID_Pair(fc, imgA, imgB, maskElig, maskNot, keyA, keyB){
+      var groups = reduceByPairDual(imgA, imgB, maskElig, maskNot);
+      var dictMID = ee.Dictionary(ee.Algorithms.If(
+        groups.size(),
+        (function(){
+          var keys = groups.map(function(g){ return ee.Number(ee.Dictionary(g).get('pair')); });
+          var sums = groups.map(function(g){ return ee.List(ee.Dictionary(g).get('sum')); });
+          var haE = ee.Dictionary.fromLists(
+            keys,
+            sums.map(function(s){ return ee.Number(ee.List(s).get(0)); })
+          );
+          var haN = ee.Dictionary.fromLists(
+            keys,
+            sums.map(function(s){ return ee.Number(ee.List(s).get(1)); })
+          );
+          return ee.Dictionary({'E':haE,'N':haN});
+        })(),
+        ee.Dictionary({'E':ee.Dictionary({}), 'N':ee.Dictionary({})})
+      ));
+      var haE = ee.Dictionary(dictMID.get('E'));
+      var haN = ee.Dictionary(dictMID.get('N'));
+      return fc.map(function(f){
+        f = ee.Feature(f);
+        var a = ee.Number(f.get(keyA + '_value')).toInt();
+        var b = ee.Number(f.get(keyB + '_value')).toInt();
+        var pair = a.multiply(10000).add(b).toInt();
+        var midE = ee.Number(haE.get(pair, 0));
+        var midN = ee.Number(haN.get(pair, 0));
+        return f.set('ha_mid_eligible', midE)
+                .set('ha_mid_not',      midN);
+      });
+    }
+
+    function ecoByRasterDual(eco, imgClass, maskElig, maskNot, key, nameFn, requireName){
+      var areaE = ha.updateMask(maskElig).rename('ha_e');
+      var areaN = ha.updateMask(maskNot ).rename('ha_n');
+      var cls   = imgClass.toInt().rename('cls');
+      var img   = ee.Image.cat([areaE, areaN, cls]);
+
+      var red = img.reduceRegions({
+        collection: eco,
+        reducer: ee.Reducer.sum().repeat(2).group({groupField:2, groupName:'cls'}),
+        scale: Landcover.SCALE_LC,
+        tileScale: 2
+      });
+
+      var exploded = ee.FeatureCollection(red.iterate(function(ft, acc){
+        ft = ee.Feature(ft);
+
+        var hasGroups = ft.propertyNames().contains('groups');
+        var groups = ee.List(ee.Algorithms.If(hasGroups, ft.get('groups'), ee.List([])));
+
+        var eco_id   = ft.get('ECO_ID');
+        var eco_name = ft.get('ECO_NAME');
+        var realm    = ft.get('REALM');
+        var biome_nm = ft.get('BIOME_NAME');
+
+        var rows = groups.map(function(g){
+          g = ee.Dictionary(g);
+          var clsV = ee.Number(g.get('cls')).toInt();
+          var sums = ee.List(g.get('sum'));
+          var haE  = ee.Number(sums.get(0));
+          var haN  = ee.Number(sums.get(1));
+          var nm   = nameFn(clsV);
+          var cond = ee.Algorithms.If(requireName, nm.length().gt(0), true);
+          var props = ee.Dictionary({})
+            .set('eco_id', eco_id)
+            .set('eco_name', eco_name)
+            .set('realm', realm)
+            .set('biome_name', biome_nm)
+            .set(key + '_value', clsV)
+            .set(key + '_name', nm)
+            .set('ha_full_eligible', haE)
+            .set('ha_full_not', haN);
+          return ee.Algorithms.If(cond, ee.Feature(null, props), null);
+        });
+
+        var fc = ee.FeatureCollection(rows).filter(ee.Filter.notNull(['ha_full_eligible']));
+        return ee.FeatureCollection(acc).merge(fc);
+      }, ee.FeatureCollection([])));
+
+      return exploded;
+    }
+
+    function attachMID_Eco(fc, eco, imgClass, maskElig, maskNot, key){
+      var midFC = ecoByRasterDual(
+        eco, imgClass, maskElig, maskNot, key,
+        function(v){return ee.String(v.format());},
+        false
+      );
+
+      var feats = midFC.toList(midFC.size());
+      var keys  = feats.map(function(f){
+        f = ee.Feature(f);
+        return ee.String(f.get('eco_id'))
+          .cat('|')
+          .cat(ee.Number(f.get(key + '_value')).format());
+      });
+      var valsE = feats.map(function(f){ return ee.Feature(f).get('ha_full_eligible'); });
+      var valsN = feats.map(function(f){ return ee.Feature(f).get('ha_full_not'); });
+      var dE = ee.Dictionary.fromLists(keys, valsE);
+      var dN = ee.Dictionary.fromLists(keys, valsN);
+
+      return fc.map(function(f){
+        f = ee.Feature(f);
+        var k = ee.String(f.get('eco_id'))
+          .cat('|')
+          .cat(ee.Number(f.get(key + '_value')).format());
+        return f.set('ha_mid_eligible', ee.Number(dE.get(k, 0)))
+                .set('ha_mid_not',      ee.Number(dN.get(k, 0)));
+      });
+    }
+
+    var prefix = 'ELIG_' + (_state.lastProject || 'PROJECT');
+
+    var soil_groups_full  = reduceByClassDual(soilImg,  fullMaskElig, fullMaskNot);
+    var biome_groups_full = reduceByClassDual(biomeImg, fullMaskElig, fullMaskNot);
+    var elev_groups_full  = reduceByClassDual(elevClass,fullMaskElig, fullMaskNot);
+
+    var soils_full  = groupsToFC_Class(soil_groups_full,  'soil',  soilName,  true);
+    var biomes_full = groupsToFC_Class(biome_groups_full, 'biome', biomeName, true);
+    var elev_full   = groupsToFC_Class(elev_groups_full,  'elev',  elevName,  false);
+
+    var soils_full_mid   = attachMID(soils_full,  soilImg,  midMaskElig, midMaskNot, 'soil');
+    var biomes_full_mid  = attachMID(biomes_full, biomeImg, midMaskElig, midMaskNot, 'biome');
+    var elev_full_mid    = attachMID(elev_full,   elevClass,midMaskElig, midMaskNot, 'elev');
+
+    var sb_groups_full = reduceByPairDual(soilImg, biomeImg,  fullMaskElig, fullMaskNot);
+    var se_groups_full = reduceByPairDual(soilImg, elevClass, fullMaskElig, fullMaskNot);
+    var be_groups_full = reduceByPairDual(biomeImg, elevClass,fullMaskElig, fullMaskNot);
+
+    var soil_biome_full = groupsToFC_Pair(sb_groups_full, 'soil','biome', soilName, biomeName, true,  true);
+    var soil_elev_full  = groupsToFC_Pair(se_groups_full, 'soil','elev',  soilName, elevName,  true,  false);
+    var biome_elev_full = groupsToFC_Pair(be_groups_full, 'biome','elev', biomeName, elevName, true,  false);
+
+    var soil_biome_full_mid = attachMID_Pair(soil_biome_full, soilImg, biomeImg,  midMaskElig, midMaskNot, 'soil','biome');
+    var soil_elev_full_mid  = attachMID_Pair(soil_elev_full,  soilImg, elevClass, midMaskElig, midMaskNot, 'soil','elev');
+    var biome_elev_full_mid = attachMID_Pair(biome_elev_full, biomeImg, elevClass, midMaskElig, midMaskNot, 'biome','elev');
+
+    var eco_soil_full  = ecoByRasterDual(ecoFC, soilImg,  fullMaskElig, fullMaskNot, 'soil',  soilName,  true);
+    var eco_biome_full = ecoByRasterDual(ecoFC, biomeImg, fullMaskElig, fullMaskNot, 'biome', biomeName, true);
+    var eco_elev_full  = ecoByRasterDual(ecoFC, elevClass,fullMaskElig, fullMaskNot, 'elev',  elevName,  false);
+
+    var eco_soil_full_mid  = attachMID_Eco(eco_soil_full,  ecoFC, soilImg,  midMaskElig, midMaskNot, 'soil');
+    var eco_biome_full_mid = attachMID_Eco(eco_biome_full, ecoFC, biomeImg, midMaskElig, midMaskNot, 'biome');
+    var eco_elev_full_mid  = attachMID_Eco(eco_elev_full,  ecoFC, elevClass,midMaskElig, midMaskNot, 'elev');
+
+    function exportTable(fc, desc){
+      Export.table.toDrive({
+        collection: fc,
+        description: desc,
+        fileNamePrefix: desc,
+        fileFormat: 'CSV'
+      });
+    }
+
+    exportTable(soils_full_mid,      prefix+'_by_soil_FULLMID');
+    exportTable(biomes_full_mid,     prefix+'_by_biome_FULLMID');
+    exportTable(elev_full_mid,       prefix+'_by_elevation_FULLMID');
+    exportTable(soil_biome_full_mid, prefix+'_by_soil_x_biome_FULLMID');
+    exportTable(soil_elev_full_mid,  prefix+'_by_soil_x_elev_FULLMID');
+    exportTable(biome_elev_full_mid, prefix+'_by_biome_x_elev_FULLMID');
+    exportTable(eco_soil_full_mid,   prefix+'_by_ecoregion_x_soil_FULLMID');
+    exportTable(eco_biome_full_mid,  prefix+'_by_ecoregion_x_biome_FULLMID');
+    exportTable(eco_elev_full_mid,   prefix+'_by_ecoregion_x_elev_FULLMID');
+
+    summaryPanel.add(ui.Label('CSV export queued', {color:'#1a7f37'}));
+  }
+
+  // ===== API =====
+  return {
+    init: init,
+    runAnalysis: runAnalysis,
+    applyEligibility: applyEligibility
+  };
+})();
+
+exports.init             = UI.init;
+exports.runAnalysis      = UI.runAnalysis;
+exports.applyEligibility = UI.applyEligibility;

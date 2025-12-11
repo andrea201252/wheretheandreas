@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getDatabase, ref, set, onValue, push, update, remove } from 'firebase/database'
+import { getDatabase, ref, set, onValue, update, remove } from 'firebase/database'
 import { Player } from '../App'
 
 const firebaseConfig = {
@@ -34,7 +34,7 @@ export const createGameRoom = async (gameId: string, players: Player[]) => {
   }
   
   players.forEach(p => {
-    gameData.players[p.id] = {
+    (gameData.players as any)[p.id] = {
       id: p.id,
       name: p.name,
       cursorColor: p.cursorColor,

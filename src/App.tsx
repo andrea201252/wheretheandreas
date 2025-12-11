@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import IntroScreen from './pages/IntroScreen'
 import GameModeScreen from './pages/GameModeScreen'
 import PlayerSetup from './pages/PlayerSetup'

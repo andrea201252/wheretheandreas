@@ -3,7 +3,7 @@ import { Player } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
 import WinPopup from '../components/WinPopup'
-import { updatePlayerScore, updateGameLevel, updateGameTime } from '../services/gameService'
+import { updatePlayerScore, updateGameTime } from '../services/gameService'
 import './GameScreen.css'
 
 interface GameScreenProps {
@@ -27,7 +27,7 @@ interface AndreaLocation {
   andrea2: Andrea
 }
 
-export default function GameScreen({ level, players, onComplete, onBackToIntro }: GameScreenProps) {
+export default function GameScreen({ level, players, gameId, onComplete, onBackToIntro }: GameScreenProps) {
   const [timeLeft, setTimeLeft] = useState(30)
   const [showSolution, setShowSolution] = useState(false)
   const [foundAndreas, setFoundAndreas] = useState<number[]>([])

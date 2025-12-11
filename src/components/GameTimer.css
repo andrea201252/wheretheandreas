@@ -1,0 +1,39 @@
+.game-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.game-timer.warning {
+  background: rgba(255, 107, 107, 0.4);
+  animation: pulse 0.8s infinite;
+}
+
+.timer-icon {
+  font-size: 1.5rem;
+}
+
+.timer-display {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  min-width: 50px;
+  text-align: center;
+}
+
+.game-timer.warning .timer-display {
+  color: #ff6b6b;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}

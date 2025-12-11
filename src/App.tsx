@@ -27,11 +27,7 @@ function App() {
 
   const handleGameModeSelect = (mode: 'local' | 'online') => {
     setGameMode(mode)
-    if (mode === 'local') {
-      setAppState('playerSetup')
-    } else {
-      setAppState('gameMode') // Mostra schermata join/create
-    }
+    setAppState('playerSetup')
   }
 
   const handlePlayersSet = (newPlayers: Player[], gId?: string) => {

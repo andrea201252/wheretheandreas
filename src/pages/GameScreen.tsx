@@ -56,8 +56,8 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
       andrea2: { id: 2, polygon: htmlPolygonToPolygon([967,618,943,628,942,679,938,711,943,728,958,741,975,752,999,746,1008,755,1020,778,1018,805,968,822,946,841,955,872,963,937,966,979,951,996,1017,1007,1044,1009,1060,951,1047,833,1007,703,1002,650,1005,638,987,615,965,612]) },
     },
     2: {
-      andrea1: { id: 1, polygon: rectToPolygon(625,537,719,612) },
-      andrea2: { id: 2, polygon: rectToPolygon(743,486,838,608) },
+      andrea1: { id: 1, polygon: rectToPolygon(624,527,706,615) },
+      andrea2: { id: 2, polygon: rectToPolygon(751,465,833,553) },
     },
     3: {
       andrea1: { id: 1, polygon: rectToPolygon(52,436,157,703) },
@@ -237,7 +237,16 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         <div className="solution-panel">
           <h3>Soluzione!</h3>
           <p>I due Andrea erano qui:</p>
-          <button onClick={handleContinue} className="continue-button">Continua al prossimo livello</button>
+          <button 
+            onClick={() => {
+              console.log('Continue button clicked')
+              handleContinue()
+            }} 
+            className="continue-button"
+            style={{ cursor: 'pointer' }}
+          >
+            Continua al prossimo livello
+          </button>
         </div>
       )}
     </div>

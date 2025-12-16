@@ -157,6 +157,8 @@
   cursor: pointer;
   font-weight: bold;
   transition: all 0.3s ease;
+  pointer-events: auto;
+  z-index: 1001;
 }
 
 .solution-panel button:hover {

@@ -34,6 +34,32 @@
   }
 }
 
+.back-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid white;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.back-button:active {
+  transform: scale(0.98);
+}
+
 .cover-image {
   max-width: 85vw;
   max-height: 75vh;
@@ -46,8 +72,8 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 15px 50px;
-  font-size: 20px;
+  padding: 12px 30px;
+  font-size: 18px;
   font-weight: bold;
   border-radius: 10px;
   cursor: pointer;

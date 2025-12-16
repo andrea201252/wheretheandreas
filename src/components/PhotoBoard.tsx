@@ -38,15 +38,15 @@ export default function PhotoBoard({
     if (!img) return
 
     const handleImageLoad = () => {
-      if (containerRef.current) {
-        const containerRect = containerRef.current.getBoundingClientRect()
-        setImageDimensions({
-          width: containerRect.width,
-          height: containerRect.height,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight
-        })
-      }
+      // Usa le dimensioni reali dell'immagine visualizzata
+      const rect = img.getBoundingClientRect()
+      setImageDimensions({
+        width: rect.width,
+        height: rect.height,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight
+      })
+      console.log(`Immagine caricata: display=${rect.width}x${rect.height}, naturale=${img.naturalWidth}x${img.naturalHeight}`)
     }
 
     if (img.complete) {
@@ -60,24 +60,22 @@ export default function PhotoBoard({
   const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!currentPlayer) return
     
-    const rect = e.currentTarget.getBoundingClientRect()
-    const containerRect = containerRef.current?.getBoundingClientRect()
-    
-    if (!containerRect) return
+    const img = e.currentTarget
+    const rect = img.getBoundingClientRect()
 
-    // Click nel contenitore
+    // Click relativo all'immagine visualizzata
     const clickX = e.clientX - rect.left
     const clickY = e.clientY - rect.top
 
     // Scala le coordinate dalla dimensione visualizzata alla dimensione originale
-    const scaleX = imageDimensions.naturalWidth / rect.width
-    const scaleY = imageDimensions.naturalHeight / rect.height
+    const scaleX = img.naturalWidth / rect.width
+    const scaleY = img.naturalHeight / rect.height
     
     const originalX = clickX * scaleX
     const originalY = clickY * scaleY
 
     console.log(`Click visualizzato: x=${clickX.toFixed(2)}, y=${clickY.toFixed(2)}`)
-    console.log(`Dimensioni immagine - display: ${rect.width}x${rect.height}, naturale: ${imageDimensions.naturalWidth}x${imageDimensions.naturalHeight}`)
+    console.log(`Dimensioni immagine - display: ${rect.width}x${rect.height}, naturale: ${img.naturalWidth}x${img.naturalHeight}`)
     console.log(`Scale factors: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`)
     console.log(`Click originale (scaled): x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}`)
 

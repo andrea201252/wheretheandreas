@@ -163,10 +163,12 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         console.log(`HIT! Andrea ${andrea.id} found!`)
         if (!foundAndreas.includes(andrea.id)) {
           const newFound = [...foundAndreas, andrea.id]
+          console.log(`Found count: ${newFound.length}/2`)
           setFoundAndreas(newFound)
           setFindersOrder([...findersOrder, playerId])
 
           if (newFound.length === 2) {
+            console.log(`VITTORIA! Entrambi gli Andrea trovati!`)
             // Registra il vincitore con il tempo impiegato
             const timeSpent = 30 - timeLeft
             const winnerData: WinnerData = {
@@ -177,6 +179,8 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
             }
             setWinners([...winners, winnerData])
             setShowWinPopup(winnerData)
+          } else {
+            console.log(`Trovato 1 Andrea, aspetta il secondo...`)
           }
         }
         return

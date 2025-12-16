@@ -14,6 +14,7 @@ interface PhotoBoardProps {
   showSolution: boolean
   andrews: Andrea[]
   players: Player[]
+  currentPlayerId?: string
 }
 
 export default function PhotoBoard({
@@ -21,22 +22,22 @@ export default function PhotoBoard({
   onPhotoClick,
   showSolution,
   andrews,
-  players
+  players,
+  currentPlayerId
 }: PhotoBoardProps) {
   const [clickPositions, setClickPositions] = useState<{ x: number; y: number; playerId: string }[]>([])
-  const [activePlayerIndex, setActivePlayerIndex] = useState(0)
+  
+  const currentPlayer = currentPlayerId ? players.find(p => p.id === currentPlayerId) : players[0]
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!currentPlayer) return
+    
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
-    const playerId = players[activePlayerIndex].id
-    setClickPositions([...clickPositions, { x, y, playerId }])
-    onPhotoClick(x, y, playerId)
-
-    // Cambia giocatore attivo
-    setActivePlayerIndex((activePlayerIndex + 1) % players.length)
+    setClickPositions([...clickPositions, { x, y, playerId: currentPlayer.id }])
+    onPhotoClick(x, y, currentPlayer.id)
   }
 
   // Converte i punti del poligono a stringa SVG path
@@ -66,7 +67,7 @@ export default function PhotoBoard({
       className="photo-board"
       onClick={handleClick}
       style={{
-        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${players[activePlayerIndex].cursorColor}"/></svg>') 16 16, auto`,
+        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${currentPlayer?.cursorColor || '#000'}"/></svg>') 16 16, auto`,
         backgroundImage: `url('/images/level${level}.jpeg')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -120,9 +121,11 @@ export default function PhotoBoard({
       ))}
 
       {/* Current player indicator */}
-      <div className="current-player-badge" style={{ color: players[activePlayerIndex].cursorColor }}>
-         {players[activePlayerIndex].name}
-      </div>
+      {currentPlayer && (
+        <div className="current-player-badge" style={{ color: currentPlayer.cursorColor }}>
+          {currentPlayer.name}
+        </div>
+      )}
     </div>
   )
 }

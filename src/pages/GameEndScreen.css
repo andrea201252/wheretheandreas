@@ -1,0 +1,271 @@
+.game-end-screen {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.game-end-container {
+  background: white;
+  border-radius: 20px;
+  padding: 3rem;
+  max-width: 800px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.game-end-title {
+  text-align: center;
+  font-size: 3rem;
+  color: #667eea;
+  margin-bottom: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.winner-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 3rem;
+  min-height: 350px;
+}
+
+.podium-position {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 200px;
+}
+
+.position-0 {
+  order: 2;
+  flex: 1.2;
+}
+
+.position-1 {
+  order: 1;
+}
+
+.position-2 {
+  order: 3;
+}
+
+.medal {
+  font-size: 4rem;
+  margin-bottom: 0.5rem;
+  animation: float 2s ease-in-out infinite;
+}
+
+.winner-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-left: 5px solid;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  transition: transform 0.3s ease;
+}
+
+.position-0 .winner-card {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.position-1 .winner-card,
+.position-2 .winner-card {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.winner-card:hover {
+  transform: translateY(-5px);
+}
+
+.winner-rank {
+  font-size: 2.5rem;
+  color: #667eea;
+  margin: 0 0 0.5rem 0;
+  font-weight: bold;
+}
+
+.winner-name {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 0.5rem 0;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.winner-wins {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0.5rem 0;
+}
+
+.winner-score {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #764ba2;
+  margin: 0.5rem 0 0 0;
+}
+
+.other-players {
+  background: #f5f7fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.other-players h3 {
+  margin-top: 0;
+  color: #667eea;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 0.5rem;
+}
+
+.other-player-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.other-player-item:last-child {
+  border-bottom: none;
+}
+
+.rank {
+  font-weight: bold;
+  color: #666;
+  min-width: 30px;
+}
+
+.name {
+  font-weight: bold;
+  flex: 1;
+}
+
+.stats {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.level-winners-detail {
+  background: #f5f7fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.level-winners-detail h3 {
+  margin-top: 0;
+  color: #667eea;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 0.5rem;
+}
+
+.winners-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.winner-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem;
+  background: white;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.level-label {
+  font-weight: bold;
+  color: #667eea;
+  min-width: 70px;
+}
+
+.winner-label {
+  flex: 1;
+  font-weight: bold;
+}
+
+.winner-time {
+  color: #999;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.no-winner {
+  color: #ccc;
+  font-style: italic;
+}
+
+.play-again-button {
+  width: 100%;
+  padding: 1.2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.play-again-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@media (max-width: 600px) {
+  .game-end-container {
+    padding: 1.5rem;
+  }
+
+  .game-end-title {
+    font-size: 2rem;
+  }
+
+  .winner-podium {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    min-height: auto;
+  }
+
+  .podium-position {
+    width: 100%;
+    max-width: 100%;
+    order: unset !important;
+    flex: unset;
+  }
+
+  .position-0 .winner-card,
+  .position-1 .winner-card,
+  .position-2 .winner-card {
+    min-height: auto;
+  }
+}

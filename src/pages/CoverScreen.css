@@ -1,4 +1,4 @@
-.cover-screen {
+﻿.cover-screen {
   width: 100vw;
   height: 100vh;
   display: flex;
@@ -35,8 +35,8 @@
 }
 
 .cover-image {
-  max-width: 70vw;
-  max-height: 60vh;
+  max-width: 85vw;
+  max-height: 75vh;
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
@@ -63,8 +63,6 @@
 
 .start-button:active {
   transform: scale(0.98);
-}
-  transform: translateX(-50%) scale(0.98);
 }
 
 .skip-button {

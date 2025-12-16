@@ -1,19 +1,20 @@
 ﻿import { useState, useEffect } from 'react'
-import { Player } from '../App'
+import { Player, WinnerData } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
 import WinPopup from '../components/WinPopup'
 import Leaderboard from '../components/Leaderboard'
 import { updatePlayerScore, updateGameTime, onPlayersUpdate } from '../services/gameService'
-import { isPointInPolygon, rectangleToPolygon, Point, Polygon } from '../utils/polygonUtils'
+import { isPointInPolygon, htmlPolygonToPolygon, Point, Polygon } from '../utils/polygonUtils'
 import './GameScreen.css'
 
 interface GameScreenProps {
   level: number
   players: Player[]
   gameId: string | null
-  onComplete: (winnerId?: string) => void
+  onComplete: (winnerId?: string, winnerData?: WinnerData) => void
   onBackToIntro: () => void
+  currentPlayerId?: string
 }
 
 interface Andrea {
@@ -26,41 +27,43 @@ interface AndreaLocation {
   andrea2: Andrea
 }
 
-export default function GameScreen({ level, players, gameId, onComplete, onBackToIntro }: GameScreenProps) {
+export default function GameScreen({ level, players, gameId, onComplete, onBackToIntro, currentPlayerId }: GameScreenProps) {
   const [timeLeft, setTimeLeft] = useState(30)
   const [showSolution, setShowSolution] = useState(false)
   const [foundAndreas, setFoundAndreas] = useState<number[]>([])
-  const [winner, setWinner] = useState<Player | null>(null)
-  const [showWinPopup, setShowWinPopup] = useState(false)
+  const [winners, setWinners] = useState<WinnerData[]>([]) // Ordine di vittoria
+  const [showWinPopup, setShowWinPopup] = useState<WinnerData | null>(null)
   const [findersOrder, setFindersOrder] = useState<string[]>([])
   const [connectedPlayers, setConnectedPlayers] = useState<Player[]>(players)
+  const [playerClicks, setPlayerClicks] = useState<Record<string, number>>({})
 
-  // Configurazione Andrea con poligoni (convertiti da rettangoli)
+  // Coordinate HTML image map convertite a poligoni - Associate al level corretto
   const andreasConfig: Record<number, AndreaLocation> = {
     1: {
-      andrea1: { id: 1, polygon: rectangleToPolygon(-1, 748, 191, 304) },
-      andrea2: { id: 2, polygon: rectangleToPolygon(938, 612, 122, 397) },
+      andrea1: { id: 1, polygon: htmlPolygonToPolygon([120,748,164,815,190,861,162,912,147,985,149,1025,110,1043,29,1052,32,979,6,959,-1,839]) },
+      andrea2: { id: 2, polygon: htmlPolygonToPolygon([967,618,943,628,942,679,938,711,943,728,958,741,975,752,999,746,1008,755,1020,778,1018,805,968,822,946,841,955,872,963,937,966,979,951,996,1017,1007,1044,1009,1060,951,1047,833,1007,703,1002,650,1005,638,987,615,965,612]) },
     },
     2: {
-      andrea1: { id: 1, polygon: rectangleToPolygon(613, 556, 76, 52) },
-      andrea2: { id: 2, polygon: rectangleToPolygon(751, 495, 82, 113) },
+      andrea1: { id: 1, polygon: htmlPolygonToPolygon([646,556,667,565,666,586,689,599,689,608,613,605,630,575]) },
+      andrea2: { id: 2, polygon: htmlPolygonToPolygon([751,495,833,608]) },
     },
     3: {
-      andrea1: { id: 1, polygon: rectangleToPolygon(58, 429, 88, 261) },
-      andrea2: { id: 2, polygon: rectangleToPolygon(904, 576, 198, 257) },
+      andrea1: { id: 1, polygon: htmlPolygonToPolygon([58,429,118,475,143,550,146,623,143,690,58,563]) },
+      andrea2: { id: 2, polygon: htmlPolygonToPolygon([904,576,932,656,977,833,1058,832,1102,707,1040,594]) },
     },
     4: {
-      andrea1: { id: 1, polygon: rectangleToPolygon(58, 887, 21, 38) },
-      andrea2: { id: 2, polygon: rectangleToPolygon(452, 806, 44, 161) },
+      andrea1: { id: 1, polygon: htmlPolygonToPolygon([58,887,79,925]) },
+      andrea2: { id: 2, polygon: htmlPolygonToPolygon([452,806,496,967]) },
     },
     5: {
-      andrea1: { id: 1, polygon: rectangleToPolygon(118, 766, 282, 85) },
-      andrea2: { id: 2, polygon: rectangleToPolygon(177, 512, 63, 131) },
+      andrea1: { id: 1, polygon: htmlPolygonToPolygon([118,766,400,851]) },
+      andrea2: { id: 2, polygon: htmlPolygonToPolygon([177,512,240,643]) },
     },
   }
 
   const currentAndreaLocations = andreasConfig[level] || andreasConfig[1]
   const currentAndreas = [currentAndreaLocations.andrea1, currentAndreaLocations.andrea2]
+  const currentPlayer = players.find(p => p.id === currentPlayerId) || players[0]
 
   // Sincronizza i giocatori online
   useEffect(() => {
@@ -101,35 +104,46 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     return () => clearTimeout(timer)
   }, [timeLeft, gameId])
 
+  // Quando c'è un vincitore, mostra il popup per 2 secondi poi passa al livello successivo
   useEffect(() => {
-    if (winner && !showSolution) {
+    if (showWinPopup && !showSolution) {
       const timer = setTimeout(async () => {
-        if (gameId) {
-          const newScore = winner.score + 10
-          await updatePlayerScore(gameId, winner.id, newScore).catch(err =>
+        if (gameId && showWinPopup) {
+          const updatedScore = (displayPlayers.find(p => p.id === showWinPopup.playerId)?.score || 0) + 10
+          console.log(`Updating score for ${showWinPopup.playerId}: ${updatedScore}`)
+          await updatePlayerScore(gameId, showWinPopup.playerId, updatedScore).catch(err =>
             console.error('Errore update score:', err)
           )
         }
-        onComplete(winner.id)
-      }, 3000)
+        // Passa i dati del vincitore a App.tsx
+        const winnerInfo: WinnerData = showWinPopup
+        onComplete(showWinPopup.playerId, winnerInfo)
+      }, 2000)
       return () => clearTimeout(timer)
     }
-  }, [winner, showSolution, onComplete, gameId])
+  }, [showWinPopup, showSolution, onComplete, gameId, displayPlayers])
 
   const handlePhotoClick = (x: number, y: number, playerId: string) => {
-    if (showSolution || winner) return
+    if (showSolution || showWinPopup) return // Non permettere click dopo vittoria
+    if (playerId !== currentPlayerId) return
 
     const player = displayPlayers.find(p => p.id === playerId)
     if (!player) return
 
+    // Limite di 10 click per giocatore
+    const currentClicks = playerClicks[playerId] || 0
+    if (currentClicks >= 10) {
+      console.log(`Player ${playerId} ha raggiunto il limite di click`)
+      return
+    }
+
+    setPlayerClicks({ ...playerClicks, [playerId]: currentClicks + 1 })
+
     const clickPoint: Point = { x, y }
     console.log(`Click at: x=${x}, y=${y}`)
-    console.log('Current Andreas:', currentAndreas)
 
     // Verifica se il click è dentro un poligono Andrea usando ray casting
     for (const andrea of currentAndreas) {
-      console.log(`Checking Andrea ${andrea.id}: `, andrea.polygon.points)
-
       if (isPointInPolygon(clickPoint, andrea.polygon)) {
         console.log(`HIT! Andrea ${andrea.id} found!`)
         if (!foundAndreas.includes(andrea.id)) {
@@ -138,37 +152,38 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
           setFindersOrder([...findersOrder, playerId])
 
           if (newFound.length === 2) {
-            setWinner(player)
-            setShowWinPopup(true)
+            // Registra il vincitore con il tempo impiegato
+            const timeSpent = 30 - timeLeft
+            const winnerData: WinnerData = {
+              playerId: player.id,
+              playerName: player.name,
+              time: timeSpent,
+              level: level
+            }
+            setWinners([...winners, winnerData])
+            setShowWinPopup(winnerData)
           }
         }
         return
       }
     }
-    console.log('No Andrea hit')
   }
 
   const handleContinue = () => {
-    onComplete()
+    onComplete(undefined, undefined)
   }
 
   return (
     <div className="game-screen">
-      {winner && !showSolution && (
-        <div className="celebration-message">
-          <span>Great {winner.name} You Find them!</span>
-        </div>
-      )}
-
       <div className="game-header">
         <h2>Level {level}</h2>
         <GameTimer timeLeft={timeLeft} />
         <div className="players-status">
           <div className="connected-players">
-            <strong>Online Players ({displayPlayers.length}):</strong>
+            <strong>Giocatori ({displayPlayers.length}):</strong>
             {displayPlayers.map(p => (
-              <div key={p.id} style={{ color: p.cursorColor }}>
-                {p.name}: {p.score}
+              <div key={p.id} style={{ color: p.cursorColor, fontWeight: p.id === currentPlayerId ? 'bold' : 'normal' }}>
+                {p.name}: {p.score} {p.id === currentPlayerId && '(Tu)'}
               </div>
             ))}
           </div>
@@ -185,20 +200,24 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
           showSolution={showSolution}
           andrews={currentAndreas}
           players={displayPlayers}
+          currentPlayerId={currentPlayerId}
         />
       </div>
 
       <Leaderboard finders={findersOrder} players={displayPlayers} />
 
-      {showWinPopup && winner && (
-        <WinPopup player={winner} onClose={() => setShowWinPopup(false)} />
+      {showWinPopup && (
+        <WinPopup 
+          player={{ ...currentPlayer, name: showWinPopup.playerName, id: showWinPopup.playerId } as Player} 
+          onClose={() => setShowWinPopup(null)} 
+        />
       )}
 
-      {showSolution && !winner && (
+      {showSolution && !showWinPopup && (
         <div className="solution-panel">
-          <h3>Solution!</h3>
-          <p>The two Andreas were here:</p>
-          <button onClick={handleContinue} className="continue-button">Continue to Next Level</button>
+          <h3>Soluzione!</h3>
+          <p>I due Andrea erano qui:</p>
+          <button onClick={handleContinue} className="continue-button">Continua al prossimo livello</button>
         </div>
       )}
     </div>

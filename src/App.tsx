@@ -3,8 +3,10 @@ import CoverScreen from './pages/CoverScreen'
 import GameModeScreen from './pages/GameModeScreen'
 import PlayerSetup from './pages/PlayerSetup'
 import GameScreen from './pages/GameScreen'
+import LevelIntroScreen from './pages/LevelIntroScreen'
 import JoinGameScreen from './pages/JoinGameScreen'
 import SelectPlayerScreen from './pages/SelectPlayerScreen'
+import GameEndScreen from './pages/GameEndScreen'
 import { getGameRoom } from './services/gameService'
 import './App.css'
 
@@ -15,7 +17,14 @@ export interface Player {
   score: number
 }
 
-type AppState = 'cover' | 'gameMode' | 'playerSetup' | 'joinGame' | 'selectPlayer' | 'playing' | 'levelComplete' | 'gameEnd'
+export interface WinnerData {
+  playerId: string
+  playerName: string
+  time: number
+  level: number
+}
+
+type AppState = 'cover' | 'gameMode' | 'playerSetup' | 'joinGame' | 'selectPlayer' | 'levelIntro' | 'playing' | 'levelComplete' | 'gameEnd'
 
 function App() {
   const [appState, setAppState] = useState<AppState>('cover')
@@ -24,8 +33,11 @@ function App() {
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameMode, setGameMode] = useState<'local' | 'create' | 'join' | null>(null)
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]) // Giocatori disponibili quando aderisci
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null) // Giocatore corrente
+  const [levelWinners, setLevelWinners] = useState<WinnerData[]>([]) // Traccia i vincitori di ogni livello
+  const [levelWinnersCount, setLevelWinnersCount] = useState<Record<number, number>>({}) // Conta vincitori per livello
 
-  // Verifica se c'� un gameId nell'URL al caricamento
+  // Verifica se c'� un gameId nell'URL al caricamento
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const urlGameId = params.get('gameId')
@@ -94,34 +106,64 @@ function App() {
   const handleSelectPlayer = (selectedPlayer: Player) => {
     // L'utente ha selezionato quale giocatore incarnare
     setPlayers([selectedPlayer])
+    setSelectedPlayerId(selectedPlayer.id)
     setAppState('playing')
   }
 
   const handlePlayersSet = (newPlayers: Player[], gId?: string) => {
     setPlayers(newPlayers)
+    // In modalità locale, il primo giocatore è quello attuale
+    setSelectedPlayerId(newPlayers[0]?.id || null)
     if (gId) {
       setGameId(gId)
     }
     setCurrentLevel(1)
-    setAppState('playing')
+    setAppState('levelIntro')
   }
 
-  const handleLevelComplete = (winnerId?: string) => {
+  const handleLevelComplete = (winnerId?: string, winnerData?: WinnerData) => {
+    console.log(`Level complete - Winner: ${winnerId}, Data:`, winnerData)
     if (winnerId) {
-      setPlayers(players.map(p =>
-        p.id === winnerId ? { ...p, score: p.score + 10 } : p
-      ))
+      const updatedPlayers = players.map(p => {
+        if (p.id === winnerId) {
+          console.log(`Updating ${p.name} score from ${p.score} to ${p.score + 10}`)
+          return { ...p, score: p.score + 10 }
+        }
+        return p
+      })
+      setPlayers(updatedPlayers)
     }
-    // Auto-advance al prossimo livello dopo 2 secondi
-    setTimeout(() => {
-      if (currentLevel >= 5) {
-        setAppState('gameEnd')
-      } else {
-        setCurrentLevel(prev => prev + 1)
-        setAppState('playing')
+    // Traccia il vincitore del livello
+    if (winnerData) {
+      const newWinners = [...levelWinners, winnerData]
+      setLevelWinners(newWinners)
+      
+      // Conta i vincitori per questo livello
+      const winnersThisLevel = newWinners.filter(w => w.level === currentLevel).length
+      const newWinnersCount = { ...levelWinnersCount, [currentLevel]: winnersThisLevel }
+      setLevelWinnersCount(newWinnersCount)
+      
+      // Se ci sono 2 giocatori, aspetta 2 vincitori. Se ce ne sono 3+, aspetta 3 vincitori
+      const winnersNeeded = Math.min(3, players.length)
+      console.log(`Level ${currentLevel} winners: ${winnersThisLevel}/${winnersNeeded}`)
+      
+      // Se sono stati raggiunti i vincitori necessari, auto-advance al livello successivo
+      if (winnersThisLevel >= winnersNeeded) {
+        setTimeout(() => {
+          if (currentLevel >= 5) {
+            setAppState('gameEnd')
+          } else {
+            setCurrentLevel(prev => prev + 1)
+            setAppState('levelIntro')
+          }
+        }, 2000)
+        setAppState('levelComplete')
+        return
       }
-    }, 2000)
-    setAppState('levelComplete')
+    }
+    
+    // Se non ci sono ancora abbastanza vincitori, rimani nel gioco
+    setAppState('playing')
   }
 
   const handleNextLevel = () => {
@@ -140,6 +182,9 @@ function App() {
     setGameId(null)
     setGameMode(null)
     setAvailablePlayers([])
+    setSelectedPlayerId(null)
+    setLevelWinners([])
+    setLevelWinnersCount({})
   }
 
   return (
@@ -176,6 +221,13 @@ function App() {
           gameId={gameId}
         />
       )}
+      {appState === 'levelIntro' && (
+        <LevelIntroScreen
+          level={currentLevel}
+          onStart={() => setAppState('playing')}
+          onBack={() => setAppState('gameMode')}
+        />
+      )}
       {appState === 'playing' && (
         <GameScreen
           level={currentLevel}
@@ -183,6 +235,7 @@ function App() {
           gameId={gameId}
           onComplete={handleLevelComplete}
           onBackToIntro={handleBackToIntro}
+          currentPlayerId={selectedPlayerId || undefined}
         />
       )}
       {appState === 'levelComplete' && (
@@ -204,19 +257,11 @@ function App() {
         </div>
       )}
       {appState === 'gameEnd' && (
-        <div className="game-end">
-          <h1>Game Over!</h1>
-          <div className="final-scores">
-            <h2>Final Scores:</h2>
-            {[...players].sort((a, b) => b.score - a.score).map((p, idx) => (
-              <div key={p.id} className="final-score-item">
-                <span className="rank">#{idx + 1}</span>
-                <span style={{ color: p.cursorColor }}>{p.name}</span>: {p.score} points
-              </div>
-            ))}
-          </div>
-          <button onClick={handleBackToIntro}>Play Again</button>
-        </div>
+        <GameEndScreen
+          players={players}
+          levelWinners={levelWinners}
+          onPlayAgain={handleBackToIntro}
+        />
       )}
     </div>
   )

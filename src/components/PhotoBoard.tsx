@@ -43,7 +43,7 @@ export default function PhotoBoard({
 
   // Converte i punti del poligono a stringa SVG path
   const polygonToPath = (polygon: Polygon): string => {
-    return polygon.points.map((p, idx) => \\ \ \\).join(' ') + ' Z'
+    return polygon.points.map((p, idx) => \\\\\\ \\\ \\\\\\).join(' ') + ' Z'
   }
 
   // Calcola il bounding box del poligono per posizionare la label
@@ -64,7 +64,7 @@ export default function PhotoBoard({
   }
 
   return (
-      <div
+    <div
       className="photo-board"
       onClick={handleClick}
       style={{

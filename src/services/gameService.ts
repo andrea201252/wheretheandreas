@@ -42,13 +42,13 @@ export const createGameRoom = async (gameId: string, players: Player[]) => {
     }
   })
 
-  await set(ref(db, games/), gameData)
+  await set(ref(db, \games/\\), gameData)
   return gameId
 }
 
 // Unisciti a una partita esistente
 export const joinGameRoom = async (gameId: string, player: Player) => {
-  await set(ref(db, games//players/), {
+  await set(ref(db, \games/\/players/\\), {
     id: player.id,
     name: player.name,
     cursorColor: player.cursorColor,
@@ -58,7 +58,7 @@ export const joinGameRoom = async (gameId: string, player: Player) => {
 
 // Ascolta gli aggiornamenti della partita in tempo reale
 export const onGameUpdates = (gameId: string, callback: (data: any) => void) => {
-  return onValue(ref(db, games/), (snapshot) => {
+  return onValue(ref(db, \games/\\), (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.val())
     }
@@ -69,12 +69,12 @@ export const onGameUpdates = (gameId: string, callback: (data: any) => void) => 
 
 // Aggiorna il punteggio di un giocatore
 export const updatePlayerScore = async (gameId: string, playerId: string, newScore: number) => {
-  await update(ref(db, games//players/), { score: newScore })
+  await update(ref(db, \games/\/players/\\), { score: newScore })
 }
 
 // Aggiorna il livello della partita
 export const updateGameLevel = async (gameId: string, level: number) => {
-  await update(ref(db, games/), {
+  await update(ref(db, \games/\\), {
     level,
     timeLeft: 30,
     winnerId: null
@@ -83,23 +83,23 @@ export const updateGameLevel = async (gameId: string, level: number) => {
 
 // Aggiorna il tempo rimanente
 export const updateGameTime = async (gameId: string, timeLeft: number) => {
-  await update(ref(db, games/), { timeLeft })
+  await update(ref(db, \games/\\), { timeLeft })
 }
 
 // Imposta il vincitore
 export const setGameWinner = async (gameId: string, playerId: string) => {
-  await update(ref(db, games/), { winnerId: playerId })
+  await update(ref(db, \games/\\), { winnerId: playerId })
 }
 
 // Cambia lo stato della partita
 export const updateGameStatus = async (gameId: string, status: 'waiting' | 'playing' | 'completed') => {
-  await update(ref(db, games/), { status })
+  await update(ref(db, \games/\\), { status })
 }
 
 // Ottieni una partita specifica
 export const getGameRoom = async (gameId: string) => {
   try {
-    const snapshot = await get(ref(db, games/))
+    const snapshot = await get(ref(db, \games/\\))
     return snapshot.exists() ? snapshot.val() : null
   } catch (error) {
     console.error('Errore nel caricamento della partita:', error)
@@ -109,12 +109,12 @@ export const getGameRoom = async (gameId: string) => {
 
 // Elimina una partita (quando finita)
 export const deleteGameRoom = async (gameId: string) => {
-  await remove(ref(db, games/))
+  await remove(ref(db, \games/\\))
 }
 
 // Ascolta cambiamenti su tutti i giocatori
 export const onPlayersUpdate = (gameId: string, callback: (players: any) => void) => {
-  return onValue(ref(db, games//players), (snapshot) => {
+  return onValue(ref(db, \games/\/players\), (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.val())
     }

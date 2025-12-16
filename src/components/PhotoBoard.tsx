@@ -75,7 +75,7 @@ export default function PhotoBoard({
     >
       {/* SVG per disegnare i poligoni */}
       <svg className="polygon-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
-        {showSolution && andrews.map(andrea => (
+        {(showSolution || true) && andrews.map(andrea => (
           <g key={`polygon-${andrea.id}`}>
             <path
               d={polygonToPath(andrea.polygon)}

@@ -8,7 +8,7 @@ interface LevelIntroScreenProps {
 
 export default function LevelIntroScreen({ level, onStart, onBack }: LevelIntroScreenProps) {
   const getIntroImage = () => {
-    return `/images/level${level}.jpeg`
+    return `/images/intro.jpeg`
   }
 
   return (

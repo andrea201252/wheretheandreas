@@ -27,11 +27,23 @@ interface AndreaLocation {
   andrea2: Andrea
 }
 
+// Converte un rettangolo HTML image map (x1,y1,x2,y2) a poligono
+const rectToPolygon = (x1: number, y1: number, x2: number, y2: number): Polygon => {
+  return {
+    points: [
+      { x: x1, y: y1 },
+      { x: x2, y: y1 },
+      { x: x2, y: y2 },
+      { x: x1, y: y2 }
+    ]
+  }
+}
+
 export default function GameScreen({ level, players, gameId, onComplete, onBackToIntro, currentPlayerId }: GameScreenProps) {
   const [timeLeft, setTimeLeft] = useState(30)
   const [showSolution, setShowSolution] = useState(false)
   const [foundAndreas, setFoundAndreas] = useState<number[]>([])
-  const [winners, setWinners] = useState<WinnerData[]>([]) // Ordine di vittoria
+  const [winners, setWinners] = useState<WinnerData[]>([])
   const [showWinPopup, setShowWinPopup] = useState<WinnerData | null>(null)
   const [findersOrder, setFindersOrder] = useState<string[]>([])
   const [connectedPlayers, setConnectedPlayers] = useState<Player[]>(players)
@@ -45,19 +57,19 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     },
     2: {
       andrea1: { id: 1, polygon: htmlPolygonToPolygon([646,556,667,565,666,586,689,599,689,608,613,605,630,575]) },
-      andrea2: { id: 2, polygon: htmlPolygonToPolygon([751,495,833,608]) },
+      andrea2: { id: 2, polygon: rectToPolygon(751,495,833,608) },
     },
     3: {
       andrea1: { id: 1, polygon: htmlPolygonToPolygon([58,429,118,475,143,550,146,623,143,690,58,563]) },
       andrea2: { id: 2, polygon: htmlPolygonToPolygon([904,576,932,656,977,833,1058,832,1102,707,1040,594]) },
     },
     4: {
-      andrea1: { id: 1, polygon: htmlPolygonToPolygon([58,887,79,925]) },
-      andrea2: { id: 2, polygon: htmlPolygonToPolygon([452,806,496,967]) },
+      andrea1: { id: 1, polygon: rectToPolygon(58,887,79,925) },
+      andrea2: { id: 2, polygon: rectToPolygon(452,806,496,967) },
     },
     5: {
-      andrea1: { id: 1, polygon: htmlPolygonToPolygon([118,766,400,851]) },
-      andrea2: { id: 2, polygon: htmlPolygonToPolygon([177,512,240,643]) },
+      andrea1: { id: 1, polygon: rectToPolygon(118,766,400,851) },
+      andrea2: { id: 2, polygon: rectToPolygon(177,512,240,643) },
     },
   }
 
@@ -141,9 +153,12 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
 
     const clickPoint: Point = { x, y }
     console.log(`Click at: x=${x}, y=${y}`)
+    console.log(`Current level ${level}, Andrews:`, currentAndreas)
+    console.log(`Checking click against ${currentAndreas.length} andrews...`)
 
     // Verifica se il click è dentro un poligono Andrea usando ray casting
     for (const andrea of currentAndreas) {
+      console.log(`Checking Andrea ${andrea.id}:`, andrea.polygon)
       if (isPointInPolygon(clickPoint, andrea.polygon)) {
         console.log(`HIT! Andrea ${andrea.id} found!`)
         if (!foundAndreas.includes(andrea.id)) {
@@ -167,6 +182,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         return
       }
     }
+    console.log(`MISS! Click not in any Andrea polygon`)
   }
 
   const handleContinue = () => {

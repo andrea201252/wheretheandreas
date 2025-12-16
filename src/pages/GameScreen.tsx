@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Player } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
@@ -34,7 +34,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const [showWinPopup, setShowWinPopup] = useState(false)
   const [findersOrder, setFindersOrder] = useState<string[]>([])
   const [connectedPlayers, setConnectedPlayers] = useState<Player[]>(players)
-  
+
   // Configurazione Andrea con poligoni (convertiti da rettangoli)
   const andreasConfig: Record<number, AndreaLocation> = {
     1: {
@@ -123,20 +123,20 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     if (!player) return
 
     const clickPoint: Point = { x, y }
-    console.log(\Click at: x=\, y=\\)
+    console.log(`Click at: x=${x}, y=${y}`)
     console.log('Current Andreas:', currentAndreas)
 
-    // Verifica se il click � dentro un poligono Andrea usando ray casting
+    // Verifica se il click è dentro un poligono Andrea usando ray casting
     for (const andrea of currentAndreas) {
-      console.log(\Checking Andrea \: \, andrea.polygon.points)
-      
+      console.log(`Checking Andrea ${andrea.id}: `, andrea.polygon.points)
+
       if (isPointInPolygon(clickPoint, andrea.polygon)) {
-        console.log(\HIT! Andrea \ found!\)
+        console.log(`HIT! Andrea ${andrea.id} found!`)
         if (!foundAndreas.includes(andrea.id)) {
           const newFound = [...foundAndreas, andrea.id]
           setFoundAndreas(newFound)
           setFindersOrder([...findersOrder, playerId])
-          
+
           if (newFound.length === 2) {
             setWinner(player)
             setShowWinPopup(true)

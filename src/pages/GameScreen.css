@@ -135,6 +135,7 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   border-left: 4px solid var(--primary-blue);
   animation: slideInRight 0.3s ease;
+  z-index: 1000;
 }
 
 .solution-panel h3 {

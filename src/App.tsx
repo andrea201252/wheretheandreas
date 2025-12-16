@@ -123,6 +123,21 @@ function App() {
 
   const handleLevelComplete = (winnerId?: string, winnerData?: WinnerData) => {
     console.log(`Level complete - Winner: ${winnerId}, Data:`, winnerData)
+    
+    // Se c'è 1 solo giocatore, passa direttamente al livello successivo quando vince
+    if (players.length === 1 && winnerData) {
+      console.log(`Solo 1 giocatore - Auto-advance al livello successivo`)
+      setTimeout(() => {
+        if (currentLevel >= 5) {
+          setAppState('gameEnd')
+        } else {
+          setCurrentLevel(prev => prev + 1)
+          setAppState('levelIntro')
+        }
+      }, 1000)
+      return
+    }
+    
     if (winnerId) {
       const updatedPlayers = players.map(p => {
         if (p.id === winnerId) {

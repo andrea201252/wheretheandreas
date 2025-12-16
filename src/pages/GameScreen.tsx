@@ -56,20 +56,20 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
       andrea2: { id: 2, polygon: htmlPolygonToPolygon([967,618,943,628,942,679,938,711,943,728,958,741,975,752,999,746,1008,755,1020,778,1018,805,968,822,946,841,955,872,963,937,966,979,951,996,1017,1007,1044,1009,1060,951,1047,833,1007,703,1002,650,1005,638,987,615,965,612]) },
     },
     2: {
-      andrea1: { id: 1, polygon: htmlPolygonToPolygon([646,556,667,565,666,586,689,599,689,608,613,605,630,575]) },
-      andrea2: { id: 2, polygon: rectToPolygon(751,495,833,608) },
+      andrea1: { id: 1, polygon: rectToPolygon(625,537,719,612) },
+      andrea2: { id: 2, polygon: rectToPolygon(743,486,838,608) },
     },
     3: {
-      andrea1: { id: 1, polygon: htmlPolygonToPolygon([58,429,118,475,143,550,146,623,143,690,58,563]) },
-      andrea2: { id: 2, polygon: htmlPolygonToPolygon([904,576,932,656,977,833,1058,832,1102,707,1040,594]) },
+      andrea1: { id: 1, polygon: rectToPolygon(52,436,157,703) },
+      andrea2: { id: 2, polygon: rectToPolygon(908,571,1084,839) },
     },
     4: {
-      andrea1: { id: 1, polygon: rectToPolygon(58,887,79,925) },
-      andrea2: { id: 2, polygon: rectToPolygon(452,806,496,967) },
+      andrea1: { id: 1, polygon: rectToPolygon(30,862,92,940) },
+      andrea2: { id: 2, polygon: rectToPolygon(445,901,507,979) },
     },
     5: {
-      andrea1: { id: 1, polygon: rectToPolygon(118,766,400,851) },
-      andrea2: { id: 2, polygon: rectToPolygon(177,512,240,643) },
+      andrea1: { id: 1, polygon: rectToPolygon(151,763,387,871) },
+      andrea2: { id: 2, polygon: rectToPolygon(157,493,238,675) },
     },
   }
 

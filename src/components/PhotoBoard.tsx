@@ -13,7 +13,6 @@ interface PhotoBoardProps {
   onPhotoClick: (x: number, y: number, playerId: string) => void
   showSolution: boolean
   andrews: Andrea[]
-  foundAndreas: number[]
   players: Player[]
 }
 
@@ -22,7 +21,6 @@ export default function PhotoBoard({
   onPhotoClick,
   showSolution,
   andrews,
-  foundAndreas,
   players
 }: PhotoBoardProps) {
   const [clickPositions, setClickPositions] = useState<{ x: number; y: number; playerId: string }[]>([])

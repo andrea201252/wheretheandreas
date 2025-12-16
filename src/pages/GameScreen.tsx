@@ -184,7 +184,6 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
           onPhotoClick={handlePhotoClick}
           showSolution={showSolution}
           andrews={currentAndreas}
-          foundAndreas={foundAndreas}
           players={displayPlayers}
         />
       </div>

@@ -63,25 +63,40 @@ export default function PhotoBoard({
     const img = e.currentTarget
     const rect = img.getBoundingClientRect()
 
-    // Click relativo all'immagine visualizzata
-    const clickX = e.clientX - rect.left
-    const clickY = e.clientY - rect.top
+    // Calcola le dimensioni effettive dell'immagine renderizzata (con object-fit: contain)
+    const imgAspectRatio = img.naturalWidth / img.naturalHeight
+    const displayAspectRatio = rect.width / rect.height
+
+    let displayWidth = rect.width
+    let displayHeight = rect.height
+    let offsetX = 0
+    let offsetY = 0
+
+    // Se il rapporto d'aspetto è diverso, c'è padding
+    if (imgAspectRatio > displayAspectRatio) {
+      // Immagine più larga - padding verticale
+      displayHeight = rect.width / imgAspectRatio
+      offsetY = (rect.height - displayHeight) / 2
+    } else {
+      // Immagine più stretta - padding orizzontale
+      displayWidth = rect.height * imgAspectRatio
+      offsetX = (rect.width - displayWidth) / 2
+    }
+
+    // Click relativo all'immagine visualizzata (senza padding)
+    const clickX = e.clientX - rect.left - offsetX
+    const clickY = e.clientY - rect.top - offsetY
 
     // Scala le coordinate dalla dimensione visualizzata alla dimensione originale
-    const scaleX = img.naturalWidth / rect.width
-    const scaleY = img.naturalHeight / rect.height
+    const scaleX = img.naturalWidth / displayWidth
+    const scaleY = img.naturalHeight / displayHeight
     
     const originalX = clickX * scaleX
     const originalY = clickY * scaleY
 
     console.log(`Click visualizzato: x=${clickX.toFixed(2)}, y=${clickY.toFixed(2)}`)
-    console.log(`Dimensioni immagine - display: ${rect.width}x${rect.height}, naturale: ${img.naturalWidth}x${img.naturalHeight}`)
-    console.log(`Scale factors: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`)
-    console.log(`Click originale (scaled): x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}`)
-
-    setClickPositions([...clickPositions, { x: originalX, y: originalY, playerId: currentPlayer.id }])
-    onPhotoClick(originalX, originalY, currentPlayer.id)
-  }
+    console.log(`Dimensioni container: ${rect.width}x${rect.height}, Dimensioni immagine effettive: ${displayWidth}x${displayHeight}, Offset: ${offsetX}, ${offsetY}`)
+    console.log(`Dimensioni naturali: ${img.naturalWidth}x${img.naturalHeight}`)
 
   // Converte i punti del poligono a stringa SVG path
   const polygonToPath = (polygon: Polygon): string => {

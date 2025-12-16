@@ -1,5 +1,4 @@
-﻿import { useState } from 'react'
-import './CoverScreen.css'
+﻿import './CoverScreen.css'
 
 interface CoverScreenProps {
   onComplete: (skipCover: boolean) => void

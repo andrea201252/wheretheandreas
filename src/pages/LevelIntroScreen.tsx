@@ -1,4 +1,3 @@
-import React from 'react'
 import './LevelIntroScreen.css'
 
 interface LevelIntroScreenProps {

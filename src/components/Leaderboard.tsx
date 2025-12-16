@@ -1,4 +1,3 @@
-import React from 'react'
 import { Player } from '../App'
 import './Leaderboard.css'
 

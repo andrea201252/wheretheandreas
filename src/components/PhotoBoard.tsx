@@ -1,7 +1,7 @@
-﻿import { useState, useRef, useEffect } from 'react'
-import { Player } from '../App'
-import { Polygon } from '../utils/polygonUtils'
-import './PhotoBoard.css'
+﻿import { useState, useRef, useEffect } from "react"
+import { Player } from "../App"
+import { Polygon } from "../utils/polygonUtils"
+import "./PhotoBoard.css"
 
 interface Andrea {
   id: number
@@ -32,13 +32,13 @@ export default function PhotoBoard({
   
   const currentPlayer = currentPlayerId ? players.find(p => p.id === currentPlayerId) : players[0]
 
-  // Quando l'immagine è caricata, salva le dimensioni
+  // Quando l"immagine è caricata, salva le dimensioni
   useEffect(() => {
     const img = imgRef.current
     if (!img) return
 
     const handleImageLoad = () => {
-      // Usa le dimensioni reali dell'immagine visualizzata
+      // Usa le dimensioni reali dell"immagine visualizzata
       const rect = img.getBoundingClientRect()
       setImageDimensions({
         width: rect.width,
@@ -52,18 +52,18 @@ export default function PhotoBoard({
     if (img.complete) {
       handleImageLoad()
     } else {
-      img.addEventListener('load', handleImageLoad)
-      return () => img.removeEventListener('load', handleImageLoad)
+      img.addEventListener("load", handleImageLoad)
+      return () => img.removeEventListener("load", handleImageLoad)
     }
   }, [level])
 
   const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!currentPlayer) return
-    
+
     const img = e.currentTarget
     const rect = img.getBoundingClientRect()
 
-    // Calcola le dimensioni effettive dell'immagine renderizzata (con object-fit: contain)
+    // Calcola le dimensioni effettive dell"immagine renderizzata (con object-fit: contain)
     const imgAspectRatio = img.naturalWidth / img.naturalHeight
     const displayAspectRatio = rect.width / rect.height
 
@@ -72,7 +72,7 @@ export default function PhotoBoard({
     let offsetX = 0
     let offsetY = 0
 
-    // Se il rapporto d'aspetto è diverso, c'è padding
+    // Se il rapporto d"aspetto è diverso, c"è padding
     if (imgAspectRatio > displayAspectRatio) {
       // Immagine più larga - padding verticale
       displayHeight = rect.width / imgAspectRatio
@@ -83,7 +83,7 @@ export default function PhotoBoard({
       offsetX = (rect.width - displayWidth) / 2
     }
 
-    // Click relativo all'immagine visualizzata (senza padding)
+    // Click relativo all"immagine visualizzata (senza padding)
     const clickX = e.clientX - rect.left - offsetX
     const clickY = e.clientY - rect.top - offsetY
 
@@ -97,10 +97,16 @@ export default function PhotoBoard({
     console.log(`Click visualizzato: x=${clickX.toFixed(2)}, y=${clickY.toFixed(2)}`)
     console.log(`Dimensioni container: ${rect.width}x${rect.height}, Dimensioni immagine effettive: ${displayWidth}x${displayHeight}, Offset: ${offsetX}, ${offsetY}`)
     console.log(`Dimensioni naturali: ${img.naturalWidth}x${img.naturalHeight}`)
+    console.log(`Scale factors: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`)
+    console.log(`Click originale (scaled): x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}`)
+
+    setClickPositions([...clickPositions, { x: originalX, y: originalY, playerId: currentPlayer.id }])
+    onPhotoClick(originalX, originalY, currentPlayer.id)
+  }
 
   // Converte i punti del poligono a stringa SVG path
   const polygonToPath = (polygon: Polygon): string => {
-    return polygon.points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z'
+    return polygon.points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z"
   }
 
   // Calcola il bounding box del poligono per posizionare la label
@@ -125,11 +131,11 @@ export default function PhotoBoard({
       ref={containerRef}
       className="photo-board"
       style={{
-        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${currentPlayer?.cursorColor || '#000'}"/></svg>') 16 16, auto`,
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden'
+        cursor: `url("data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"6\" fill=\"${currentPlayer?.cursorColor || "#000"}\"/></svg>") 16 16, auto`,
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden"
       }}
     >
       {/* Immagine del livello */}
@@ -139,12 +145,12 @@ export default function PhotoBoard({
         alt={`Level ${level}`}
         onClick={handleClick}
         style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center',
-          display: 'block',
-          cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${currentPlayer?.cursorColor || '#000'}"/></svg>') 16 16, auto`
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          display: "block",
+          cursor: `url("data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"6\" fill=\"${currentPlayer?.cursorColor || "#000"}\"/></svg>") 16 16, auto`
         }}
       />
 
@@ -152,12 +158,12 @@ export default function PhotoBoard({
       <svg 
         className="polygon-overlay" 
         style={{ 
-          position: 'absolute', 
+          position: "absolute", 
           top: 0, 
           left: 0, 
-          width: imageDimensions.naturalWidth || '100%', 
-          height: imageDimensions.naturalHeight || '100%',
-          pointerEvents: 'none'
+          width: imageDimensions.naturalWidth || "100%", 
+          height: imageDimensions.naturalHeight || "100%",
+          pointerEvents: "none"
         }}
         viewBox={`0 0 ${imageDimensions.naturalWidth} ${imageDimensions.naturalHeight}`}
       >
@@ -184,7 +190,7 @@ export default function PhotoBoard({
             style={{
               left: `${center.x}px`,
               top: `${center.y}px`,
-              transform: 'translate(-50%, -50%)'
+              transform: "translate(-50%, -50%)"
             }}
           >
             Andrea {andrea.id}
@@ -201,7 +207,7 @@ export default function PhotoBoard({
             left: `${pos.x}px`,
             top: `${pos.y}px`,
             borderColor: players.find(p => p.id === pos.playerId)?.cursorColor,
-            backgroundColor: players.find(p => p.id === pos.playerId)?.cursorColor + '20'
+            backgroundColor: players.find(p => p.id === pos.playerId)?.cursorColor + "20"
           }}
         />
       ))}

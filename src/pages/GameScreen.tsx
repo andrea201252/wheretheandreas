@@ -116,24 +116,12 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     return () => clearTimeout(timer)
   }, [timeLeft, gameId])
 
-  // Quando c'è un vincitore, mostra il popup per 2 secondi poi passa al livello successivo
+  // Quando c'è un vincitore, mostra il popup (senza auto-advance)
   useEffect(() => {
     if (showWinPopup && !showSolution) {
-      const timer = setTimeout(async () => {
-        if (gameId && showWinPopup) {
-          const updatedScore = (displayPlayers.find(p => p.id === showWinPopup.playerId)?.score || 0) + 10
-          console.log(`Updating score for ${showWinPopup.playerId}: ${updatedScore}`)
-          await updatePlayerScore(gameId, showWinPopup.playerId, updatedScore).catch(err =>
-            console.error('Errore update score:', err)
-          )
-        }
-        // Passa i dati del vincitore a App.tsx
-        const winnerInfo: WinnerData = showWinPopup
-        onComplete(showWinPopup.playerId, winnerInfo)
-      }, 2000)
-      return () => clearTimeout(timer)
+      console.log(`Popup di vittoria mostrato per ${showWinPopup.playerName}`)
     }
-  }, [showWinPopup, showSolution, onComplete, gameId, displayPlayers])
+  }, [showWinPopup, showSolution])
 
   const handlePhotoClick = (x: number, y: number, playerId: string) => {
     if (showSolution || showWinPopup) return // Non permettere click dopo vittoria
@@ -189,8 +177,20 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     console.log(`MISS! Click not in any Andrea polygon`)
   }
 
-  const handleContinue = () => {
-    onComplete(undefined, undefined)
+  const handleContinue = async () => {
+    if (showWinPopup && gameId) {
+      const updatedScore = (displayPlayers.find(p => p.id === showWinPopup.playerId)?.score || 0) + 10
+      console.log(`Updating score for ${showWinPopup.playerId}: ${updatedScore}`)
+      await updatePlayerScore(gameId, showWinPopup.playerId, updatedScore).catch(err =>
+        console.error('Errore update score:', err)
+      )
+    }
+    // Passa i dati del vincitore a App.tsx
+    if (showWinPopup) {
+      onComplete(showWinPopup.playerId, showWinPopup)
+    } else {
+      onComplete(undefined, undefined)
+    }
   }
 
   return (
@@ -227,10 +227,18 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
       <Leaderboard finders={findersOrder} players={displayPlayers} />
 
       {showWinPopup && (
-        <WinPopup 
-          player={{ ...currentPlayer, name: showWinPopup.playerName, id: showWinPopup.playerId } as Player} 
-          onClose={() => setShowWinPopup(null)} 
-        />
+        <div className="solution-panel">
+          <h3>🎉 Vittoria!</h3>
+          <p><strong>{showWinPopup.playerName}</strong> ha trovato entrambi gli Andrea!</p>
+          <p>Tempo: <strong>{showWinPopup.time}s</strong></p>
+          <button 
+            onClick={handleContinue}
+            className="continue-button"
+            style={{ cursor: 'pointer' }}
+          >
+            Continua al prossimo livello
+          </button>
+        </div>
       )}
 
       {showSolution && !showWinPopup && (

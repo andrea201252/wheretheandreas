@@ -26,10 +26,6 @@ function App() {
     setAppState('gameMode')
   }
 
-  const handleStartGame = () => {
-    setAppState('gameMode')
-  }
-
   const handleGameModeSelect = (mode: 'local' | 'create' | 'join') => {
     setGameMode(mode)
     if (mode === 'local') {

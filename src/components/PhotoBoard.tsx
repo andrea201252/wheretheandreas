@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import { Player } from '../App'
 import { Polygon } from '../utils/polygonUtils'
 import './PhotoBoard.css'
@@ -26,18 +26,63 @@ export default function PhotoBoard({
   currentPlayerId
 }: PhotoBoardProps) {
   const [clickPositions, setClickPositions] = useState<{ x: number; y: number; playerId: string }[]>([])
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, naturalWidth: 0, naturalHeight: 0 })
+  const imgRef = useRef<HTMLImageElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   
   const currentPlayer = currentPlayerId ? players.find(p => p.id === currentPlayerId) : players[0]
 
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Quando l'immagine è caricata, salva le dimensioni
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img) return
+
+    const handleImageLoad = () => {
+      if (containerRef.current) {
+        const containerRect = containerRef.current.getBoundingClientRect()
+        setImageDimensions({
+          width: containerRect.width,
+          height: containerRect.height,
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight
+        })
+      }
+    }
+
+    if (img.complete) {
+      handleImageLoad()
+    } else {
+      img.addEventListener('load', handleImageLoad)
+      return () => img.removeEventListener('load', handleImageLoad)
+    }
+  }, [level])
+
+  const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!currentPlayer) return
     
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const containerRect = containerRef.current?.getBoundingClientRect()
+    
+    if (!containerRect) return
 
-    setClickPositions([...clickPositions, { x, y, playerId: currentPlayer.id }])
-    onPhotoClick(x, y, currentPlayer.id)
+    // Click nel contenitore
+    const clickX = e.clientX - rect.left
+    const clickY = e.clientY - rect.top
+
+    // Scala le coordinate dalla dimensione visualizzata alla dimensione originale
+    const scaleX = imageDimensions.naturalWidth / rect.width
+    const scaleY = imageDimensions.naturalHeight / rect.height
+    
+    const originalX = clickX * scaleX
+    const originalY = clickY * scaleY
+
+    console.log(`Click visualizzato: x=${clickX.toFixed(2)}, y=${clickY.toFixed(2)}`)
+    console.log(`Dimensioni immagine - display: ${rect.width}x${rect.height}, naturale: ${imageDimensions.naturalWidth}x${imageDimensions.naturalHeight}`)
+    console.log(`Scale factors: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`)
+    console.log(`Click originale (scaled): x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}`)
+
+    setClickPositions([...clickPositions, { x: originalX, y: originalY, playerId: currentPlayer.id }])
+    onPhotoClick(originalX, originalY, currentPlayer.id)
   }
 
   // Converte i punti del poligono a stringa SVG path
@@ -64,18 +109,46 @@ export default function PhotoBoard({
 
   return (
     <div
+      ref={containerRef}
       className="photo-board"
-      onClick={handleClick}
       style={{
         cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${currentPlayer?.cursorColor || '#000'}"/></svg>') 16 16, auto`,
-        backgroundImage: `url('/images/level${level}.jpeg')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden'
       }}
     >
-      {/* SVG per disegnare i poligoni */}
-      <svg className="polygon-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
-        {(showSolution || true) && andrews.map(andrea => (
+      {/* Immagine del livello */}
+      <img
+        ref={imgRef}
+        src={`/images/level${level}.jpeg`}
+        alt={`Level ${level}`}
+        onClick={handleClick}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          display: 'block',
+          cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${currentPlayer?.cursorColor || '#000'}"/></svg>') 16 16, auto`
+        }}
+      />
+
+      {/* SVG per disegnare i poligoni - scalati alle coordinate originali */}
+      <svg 
+        className="polygon-overlay" 
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          width: imageDimensions.naturalWidth || '100%', 
+          height: imageDimensions.naturalHeight || '100%',
+          pointerEvents: 'none'
+        }}
+        viewBox={`0 0 ${imageDimensions.naturalWidth} ${imageDimensions.naturalHeight}`}
+      >
+        {(showSolution) && andrews.map(andrea => (
           <g key={`polygon-${andrea.id}`}>
             <path
               d={polygonToPath(andrea.polygon)}

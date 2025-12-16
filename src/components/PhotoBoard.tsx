@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Player } from '../App'
 import { Polygon } from '../utils/polygonUtils'
 import './PhotoBoard.css'
@@ -43,7 +43,7 @@ export default function PhotoBoard({
 
   // Converte i punti del poligono a stringa SVG path
   const polygonToPath = (polygon: Polygon): string => {
-    return polygon.points.map((p, idx) => \\\\\\ \\\ \\\\\\).join(' ') + ' Z'
+    return polygon.points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z'
   }
 
   // Calcola il bounding box del poligono per posizionare la label
@@ -68,8 +68,8 @@ export default function PhotoBoard({
       className="photo-board"
       onClick={handleClick}
       style={{
-        cursor: \url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="\"/></svg>') 16 16, auto\,
-        backgroundImage: \url('/images/level\.jpeg')\,
+        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${players[activePlayerIndex].cursorColor}"/></svg>') 16 16, auto`,
+        backgroundImage: `url('/images/level${level}.jpeg')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
@@ -77,7 +77,7 @@ export default function PhotoBoard({
       {/* SVG per disegnare i poligoni */}
       <svg className="polygon-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
         {showSolution && andrews.map(andrea => (
-          <g key={\polygon-\\}>
+          <g key={`polygon-${andrea.id}`}>
             <path
               d={polygonToPath(andrea.polygon)}
               className="andrea-polygon"
@@ -94,11 +94,11 @@ export default function PhotoBoard({
         const center = getPolygonCenter(andrea.polygon)
         return (
           <div
-            key={\label-\\}
+            key={`label-${andrea.id}`}
             className="andrea-label"
             style={{
-              left: \\px\,
-              top: \\px\,
+              left: `${center.x}px`,
+              top: `${center.y}px`,
               transform: 'translate(-50%, -50%)'
             }}
           >
@@ -113,8 +113,8 @@ export default function PhotoBoard({
           key={idx}
           className="click-marker"
           style={{
-            left: \\px\,
-            top: \\px\,
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
             borderColor: players.find(p => p.id === pos.playerId)?.cursorColor,
             backgroundColor: players.find(p => p.id === pos.playerId)?.cursorColor + '20'
           }}

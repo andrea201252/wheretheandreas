@@ -45,6 +45,21 @@
   border-radius: 6px;
 }
 
+.polygon-overlay {
+  pointer-events: none;
+  z-index: 10;
+}
+
+.andrea-polygon {
+  filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.5));
+  transition: all 0.3s ease;
+}
+
+.andrea-polygon:hover {
+  fill: rgba(255, 107, 107, 0.3);
+  filter: drop-shadow(0 0 15px rgba(255, 107, 107, 0.8));
+}
+
 .arrow-indicator {
   position: absolute;
   font-size: 2.5rem;
@@ -88,26 +103,18 @@
   }
 }
 
-.andrea-rectangle {
-  position: absolute;
-  border: 3px solid #ff6b6b;
-  background: rgba(255, 107, 107, 0.15);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
-  animation: pulse 0.8s ease-in-out infinite;
-}
-
 .andrea-label {
-  color: #ff6b6b;
+  position: absolute;
+  color: white;
   font-weight: bold;
   font-size: 14px;
-  background: rgba(255, 107, 107, 0.8);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
+  background: rgba(255, 107, 107, 0.9);
+  padding: 6px 12px;
+  border-radius: 6px;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 @keyframes pulse {

@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { Player } from '../App'
+import { Polygon } from '../utils/polygonUtils'
 import './PhotoBoard.css'
 
 interface Andrea {
   id: number
-  x: number
-  y: number
-  width: number
-  height: number
-  buffer?: number
+  polygon: Polygon
 }
 
 interface PhotoBoardProps {
@@ -20,10 +17,10 @@ interface PhotoBoardProps {
   players: Player[]
 }
 
-export default function PhotoBoard({ 
-  level, 
-  onPhotoClick, 
-  showSolution, 
+export default function PhotoBoard({
+  level,
+  onPhotoClick,
+  showSolution,
   andrews,
   foundAndreas,
   players
@@ -44,46 +41,71 @@ export default function PhotoBoard({
     setActivePlayerIndex((activePlayerIndex + 1) % players.length)
   }
 
+  // Converte i punti del poligono a stringa SVG path
+  const polygonToPath = (polygon: Polygon): string => {
+    return polygon.points.map((p, idx) => \\ \ \\).join(' ') + ' Z'
+  }
+
+  // Calcola il bounding box del poligono per posizionare la label
+  const getPolygonCenter = (polygon: Polygon) => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    polygon.points.forEach(p => {
+      minX = Math.min(minX, p.x)
+      maxX = Math.max(maxX, p.x)
+      minY = Math.min(minY, p.y)
+      maxY = Math.max(maxY, p.y)
+    })
+    return {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+      width: maxX - minX,
+      height: maxY - minY
+    }
+  }
+
   return (
-      <div 
-      className="photo-board" 
+      <div
+      className="photo-board"
       onClick={handleClick}
       style={{
-        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${players[activePlayerIndex].cursorColor}"/></svg>') 16 16, auto`,
-        backgroundImage: `url('/images/level${level}.jpeg')`,
+        cursor: \url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="\"/></svg>') 16 16, auto\,
+        backgroundImage: \url('/images/level\.jpeg')\,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
     >
-      {/* Rettangoli degli Andrea per debug/soluzione */}
-      {showSolution && andrews.map(andrea => (
-        <div
-          key={`rect-${andrea.id}`}
-          className="andrea-rectangle"
-          style={{
-            left: `${andrea.x}px`,
-            top: `${andrea.y}px`,
-            width: `${andrea.width}px`,
-            height: `${andrea.height}px`,
-          }}
-        >
-          <span className="andrea-label">Andrea {andrea.id}</span>
-        </div>
-      ))}
+      {/* SVG per disegnare i poligoni */}
+      <svg className="polygon-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+        {showSolution && andrews.map(andrea => (
+          <g key={\polygon-\\}>
+            <path
+              d={polygonToPath(andrea.polygon)}
+              className="andrea-polygon"
+              fill="rgba(255, 107, 107, 0.2)"
+              stroke="#FF6B6B"
+              strokeWidth="3"
+            />
+          </g>
+        ))}
+      </svg>
 
-      {/* Arrows che puntano agli Andrea */}
-      {(showSolution || foundAndreas.length > 0) && andrews.map(andrea => (
-        <div
-          key={andrea.id}
-          className="arrow-indicator"
-          style={{
-            left: `${andrea.x + andrea.width / 2}px`,
-            top: `${andrea.y + andrea.height / 2}px`,
-          }}
-        >
-          ↓
-        </div>
-      ))}
+      {/* Label dei poligoni */}
+      {showSolution && andrews.map(andrea => {
+        const center = getPolygonCenter(andrea.polygon)
+        return (
+          <div
+            key={\label-\\}
+            className="andrea-label"
+            style={{
+              left: \\px\,
+              top: \\px\,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            Andrea {andrea.id}
+          </div>
+        )
+      })}
 
       {/* Visual feedback dei click */}
       {clickPositions.map((pos, idx) => (
@@ -91,8 +113,8 @@ export default function PhotoBoard({
           key={idx}
           className="click-marker"
           style={{
-            left: `${pos.x}px`,
-            top: `${pos.y}px`,
+            left: \\px\,
+            top: \\px\,
             borderColor: players.find(p => p.id === pos.playerId)?.cursorColor,
             backgroundColor: players.find(p => p.id === pos.playerId)?.cursorColor + '20'
           }}
@@ -101,7 +123,7 @@ export default function PhotoBoard({
 
       {/* Current player indicator */}
       <div className="current-player-badge" style={{ color: players[activePlayerIndex].cursorColor }}>
-        🎮 {players[activePlayerIndex].name}
+         {players[activePlayerIndex].name}
       </div>
     </div>
   )

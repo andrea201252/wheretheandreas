@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import CoverScreen from './pages/CoverScreen'
 import GameModeScreen from './pages/GameModeScreen'
 import PlayerSetup from './pages/PlayerSetup'
 import GameScreen from './pages/GameScreen'
 import JoinGameScreen from './pages/JoinGameScreen'
+import SelectPlayerScreen from './pages/SelectPlayerScreen'
+import { getGameRoom } from './services/gameService'
 import './App.css'
 
 export interface Player {
@@ -13,7 +15,7 @@ export interface Player {
   score: number
 }
 
-type AppState = 'cover' | 'gameMode' | 'playerSetup' | 'joinGame' | 'playing' | 'levelComplete' | 'gameEnd'
+type AppState = 'cover' | 'gameMode' | 'playerSetup' | 'joinGame' | 'selectPlayer' | 'playing' | 'levelComplete' | 'gameEnd'
 
 function App() {
   const [appState, setAppState] = useState<AppState>('cover')
@@ -21,6 +23,35 @@ function App() {
   const [players, setPlayers] = useState<Player[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameMode, setGameMode] = useState<'local' | 'create' | 'join' | null>(null)
+  const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]) // Giocatori disponibili quando aderisci
+
+  // Verifica se c'è un gameId nell'URL al caricamento
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlGameId = params.get('gameId')
+    
+    if (urlGameId) {
+      setGameId(urlGameId)
+      setGameMode('join')
+      // Carica i giocatori disponibili dalla partita
+      getGameRoom(urlGameId)
+        .then(gameRoom => {
+          if (gameRoom && gameRoom.players) {
+            const players = Object.values(gameRoom.players).map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              cursorColor: p.cursorColor,
+              score: p.score || 0
+            })) as Player[]
+            setAvailablePlayers(players)
+            setAppState('selectPlayer')
+          }
+        })
+        .catch(err => console.error('Errore caricamento gioco:', err))
+    } else {
+      setAppState('cover')
+    }
+  }, [])
 
   const handleCoverComplete = () => {
     setAppState('gameMode')
@@ -40,7 +71,30 @@ function App() {
   const handleJoinGame = (gId: string) => {
     setGameId(gId)
     setGameMode('join')
-    setAppState('playerSetup')
+    // Carica i giocatori disponibili
+    getGameRoom(gId)
+      .then(gameRoom => {
+        if (gameRoom && gameRoom.players) {
+          const players = Object.values(gameRoom.players).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            cursorColor: p.cursorColor,
+            score: p.score || 0
+          })) as Player[]
+          setAvailablePlayers(players)
+          setAppState('selectPlayer')
+        }
+      })
+      .catch(err => {
+        console.error('Errore caricamento gioco:', err)
+        setAppState('joinGame') // Ritorna indietro se errore
+      })
+  }
+
+  const handleSelectPlayer = (selectedPlayer: Player) => {
+    // L'utente ha selezionato quale giocatore incarnare
+    setPlayers([selectedPlayer])
+    setAppState('playing')
   }
 
   const handlePlayersSet = (newPlayers: Player[], gId?: string) => {
@@ -54,7 +108,7 @@ function App() {
 
   const handleLevelComplete = (winnerId?: string) => {
     if (winnerId) {
-      setPlayers(players.map(p => 
+      setPlayers(players.map(p =>
         p.id === winnerId ? { ...p, score: p.score + 10 } : p
       ))
     }
@@ -85,33 +139,46 @@ function App() {
     setPlayers([])
     setGameId(null)
     setGameMode(null)
+    setAvailablePlayers([])
   }
 
   return (
     <div className="app">
       {appState === 'cover' && <CoverScreen onComplete={handleCoverComplete} />}
       {appState === 'gameMode' && (
-        <GameModeScreen 
+        <GameModeScreen
           onSelectMode={handleGameModeSelect}
           onBack={handleBackToIntro}
         />
       )}
       {appState === 'joinGame' && (
-        <JoinGameScreen 
+        <JoinGameScreen
           onJoinGame={handleJoinGame}
           onBackToMode={() => setAppState('gameMode')}
         />
       )}
+      {appState === 'selectPlayer' && (
+        <SelectPlayerScreen
+          availablePlayers={availablePlayers}
+          onSelectPlayer={handleSelectPlayer}
+          onBackToMode={() => {
+            setAppState('gameMode')
+            setGameId(null)
+            setGameMode(null)
+            setAvailablePlayers([])
+          }}
+        />
+      )}
       {appState === 'playerSetup' && (
-        <PlayerSetup 
+        <PlayerSetup
           onPlayersSet={handlePlayersSet}
           isOnline={gameMode === 'create' || gameMode === 'join'}
           gameId={gameId}
         />
       )}
       {appState === 'playing' && (
-        <GameScreen 
-          level={currentLevel} 
+        <GameScreen
+          level={currentLevel}
           players={players}
           gameId={gameId}
           onComplete={handleLevelComplete}

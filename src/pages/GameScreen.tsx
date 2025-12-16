@@ -4,7 +4,8 @@ import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
 import WinPopup from '../components/WinPopup'
 import Leaderboard from '../components/Leaderboard'
-import { updatePlayerScore, updateGameTime } from '../services/gameService'
+import { updatePlayerScore, updateGameTime, onPlayersUpdate } from '../services/gameService'
+import { isPointInPolygon, rectangleToPolygon, Point, Polygon } from '../utils/polygonUtils'
 import './GameScreen.css'
 
 interface GameScreenProps {
@@ -17,11 +18,7 @@ interface GameScreenProps {
 
 interface Andrea {
   id: number
-  x: number
-  y: number
-  width: number
-  height: number
-  buffer: number
+  polygon: Polygon
 }
 
 interface AndreaLocation {
@@ -35,35 +32,56 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const [foundAndreas, setFoundAndreas] = useState<number[]>([])
   const [winner, setWinner] = useState<Player | null>(null)
   const [showWinPopup, setShowWinPopup] = useState(false)
-  const [findersOrder, setFindersOrder] = useState<string[]>([]) // Ordine di chi ha trovato
-  const BUFFER = 120 // Buffer intorno alle coordinate - aumentato per facilità di click
+  const [findersOrder, setFindersOrder] = useState<string[]>([])
+  const [connectedPlayers, setConnectedPlayers] = useState<Player[]>(players)
   
-  // Configurazione Andrea per livelli con le coordinate corrette
+  // Configurazione Andrea con poligoni (convertiti da rettangoli)
   const andreasConfig: Record<number, AndreaLocation> = {
     1: {
-      andrea1: { id: 1, x: -1, y: 748, width: 191, height: 304, buffer: BUFFER },
-      andrea2: { id: 2, x: 938, y: 612, width: 122, height: 397, buffer: BUFFER },
+      andrea1: { id: 1, polygon: rectangleToPolygon(-1, 748, 191, 304) },
+      andrea2: { id: 2, polygon: rectangleToPolygon(938, 612, 122, 397) },
     },
     2: {
-      andrea1: { id: 1, x: 613, y: 556, width: 76, height: 52, buffer: BUFFER },
-      andrea2: { id: 2, x: 751, y: 495, width: 82, height: 113, buffer: BUFFER },
+      andrea1: { id: 1, polygon: rectangleToPolygon(613, 556, 76, 52) },
+      andrea2: { id: 2, polygon: rectangleToPolygon(751, 495, 82, 113) },
     },
     3: {
-      andrea1: { id: 1, x: 58, y: 429, width: 88, height: 261, buffer: BUFFER },
-      andrea2: { id: 2, x: 904, y: 576, width: 198, height: 257, buffer: BUFFER },
+      andrea1: { id: 1, polygon: rectangleToPolygon(58, 429, 88, 261) },
+      andrea2: { id: 2, polygon: rectangleToPolygon(904, 576, 198, 257) },
     },
     4: {
-      andrea1: { id: 1, x: 58, y: 887, width: 21, height: 38, buffer: BUFFER },
-      andrea2: { id: 2, x: 452, y: 806, width: 44, height: 161, buffer: BUFFER },
+      andrea1: { id: 1, polygon: rectangleToPolygon(58, 887, 21, 38) },
+      andrea2: { id: 2, polygon: rectangleToPolygon(452, 806, 44, 161) },
     },
     5: {
-      andrea1: { id: 1, x: 118, y: 766, width: 282, height: 85, buffer: BUFFER },
-      andrea2: { id: 2, x: 177, y: 512, width: 63, height: 131, buffer: BUFFER },
+      andrea1: { id: 1, polygon: rectangleToPolygon(118, 766, 282, 85) },
+      andrea2: { id: 2, polygon: rectangleToPolygon(177, 512, 63, 131) },
     },
   }
 
   const currentAndreaLocations = andreasConfig[level] || andreasConfig[1]
   const currentAndreas = [currentAndreaLocations.andrea1, currentAndreaLocations.andrea2]
+
+  // Sincronizza i giocatori online
+  useEffect(() => {
+    if (!gameId) return
+
+    const unsubscribe = onPlayersUpdate(gameId, (playersData) => {
+      if (playersData) {
+        const syncedPlayers = Object.values(playersData).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          cursorColor: p.cursorColor,
+          score: p.score || 0
+        })) as Player[]
+        setConnectedPlayers(syncedPlayers)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [gameId])
+
+  const displayPlayers = gameId ? connectedPlayers : players
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -74,8 +92,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     const timer = setTimeout(() => {
       const newTime = timeLeft - 1
       setTimeLeft(newTime)
-      
-      // Aggiorna il tempo su Firebase se online
+
       if (gameId) {
         updateGameTime(gameId, newTime).catch(err => console.error('Errore update tempo:', err))
       }
@@ -85,13 +102,11 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   }, [timeLeft, gameId])
 
   useEffect(() => {
-    // Passa automaticamente al prossimo livello dopo 3 secondi se vinto prima del tempo
     if (winner && !showSolution) {
       const timer = setTimeout(async () => {
-        // Aggiorna punteggio su Firebase se online
         if (gameId) {
           const newScore = winner.score + 10
-          await updatePlayerScore(gameId, winner.id, newScore).catch(err => 
+          await updatePlayerScore(gameId, winner.id, newScore).catch(err =>
             console.error('Errore update score:', err)
           )
         }
@@ -104,30 +119,24 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const handlePhotoClick = (x: number, y: number, playerId: string) => {
     if (showSolution || winner) return
 
-    const player = players.find(p => p.id === playerId)
+    const player = displayPlayers.find(p => p.id === playerId)
     if (!player) return
 
-    // Log per debug
-    console.log(`Click at: x=${x}, y=${y}`)
+    const clickPoint: Point = { x, y }
+    console.log(\Click at: x=\, y=\\)
     console.log('Current Andreas:', currentAndreas)
 
-    // Verifica se il click è su un Andrea
+    // Verifica se il click � dentro un poligono Andrea usando ray casting
     for (const andrea of currentAndreas) {
-      console.log(`Checking Andrea ${andrea.id}: x=${andrea.x}-${andrea.x + andrea.width}, y=${andrea.y}-${andrea.y + andrea.height}`)
+      console.log(\Checking Andrea \: \, andrea.polygon.points)
       
-      if (
-        x >= andrea.x &&
-        x <= andrea.x + andrea.width &&
-        y >= andrea.y &&
-        y <= andrea.y + andrea.height
-      ) {
-        console.log(`HIT! Andrea ${andrea.id} found!`)
+      if (isPointInPolygon(clickPoint, andrea.polygon)) {
+        console.log(\HIT! Andrea \ found!\)
         if (!foundAndreas.includes(andrea.id)) {
           const newFound = [...foundAndreas, andrea.id]
           setFoundAndreas(newFound)
           setFindersOrder([...findersOrder, playerId])
           
-          // Se trovi entrambi, mostra il popup di vittoria
           if (newFound.length === 2) {
             setWinner(player)
             setShowWinPopup(true)
@@ -139,8 +148,8 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     console.log('No Andrea hit')
   }
 
-  const handleShowSolution = () => {
-    setShowSolution(true)
+  const handleContinue = () => {
+    onComplete()
   }
 
   return (
@@ -155,14 +164,17 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         <h2>Level {level}</h2>
         <GameTimer timeLeft={timeLeft} />
         <div className="players-status">
-          {players.map(p => (
-            <div key={p.id} style={{ color: p.cursorColor }}>
-              {p.name}: {p.score}
-            </div>
-          ))}
+          <div className="connected-players">
+            <strong>Online Players ({displayPlayers.length}):</strong>
+            {displayPlayers.map(p => (
+              <div key={p.id} style={{ color: p.cursorColor }}>
+                {p.name}: {p.score}
+              </div>
+            ))}
+          </div>
         </div>
         <button onClick={onBackToIntro} className="back-button">
-          ← Back
+           Back
         </button>
       </div>
 
@@ -173,11 +185,11 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
           showSolution={showSolution}
           andrews={currentAndreas}
           foundAndreas={foundAndreas}
-          players={players}
+          players={displayPlayers}
         />
       </div>
 
-      <Leaderboard finders={findersOrder} players={players} />
+      <Leaderboard finders={findersOrder} players={displayPlayers} />
 
       {showWinPopup && winner && (
         <WinPopup player={winner} onClose={() => setShowWinPopup(false)} />
@@ -187,9 +199,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         <div className="solution-panel">
           <h3>Solution!</h3>
           <p>The two Andreas were here:</p>
-          {timeLeft <= 0 && !foundAndreas.includes(1) && (
-            <button onClick={handleShowSolution}>Continue</button>
-          )}
+          <button onClick={handleContinue} className="continue-button">Continue to Next Level</button>
         </div>
       )}
     </div>

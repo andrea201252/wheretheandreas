@@ -1,4 +1,4 @@
-.game-mode-screen {
+.select-player-screen {
   width: 100%;
   height: 100vh;
   display: flex;
@@ -10,7 +10,7 @@
   position: relative;
 }
 
-.back-button-top {
+.back-button-select {
   position: absolute;
   top: 2rem;
   left: 2rem;
@@ -25,38 +25,43 @@
   font-size: 1rem;
 }
 
-.back-button-top:hover {
+.back-button-select:hover {
   background: linear-gradient(135deg, #2c5aa0 0%, #1a3a60 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
 }
 
-.mode-container {
+.select-player-container {
   text-align: center;
   max-width: 1000px;
   width: 100%;
 }
 
-.mode-container h1 {
-  font-size: 2.8rem;
+.select-player-container h1 {
+  font-size: 2.5rem;
   color: #2c3e50;
-  margin-bottom: 3rem;
+  margin-bottom: 1rem;
   font-weight: bold;
 }
 
-.modes {
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
-  flex-wrap: wrap;
+.select-player-container > p {
+  font-size: 1.2rem;
+  color: #555;
+  margin-bottom: 2rem;
 }
 
-.mode-card {
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  width: 100%;
+}
+
+.player-card-select {
   background: white;
   border-radius: 16px;
-  padding: 2.5rem 2rem;
+  padding: 2rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  max-width: 320px;
   transition: all 0.3s ease;
   border: 3px solid transparent;
   cursor: pointer;
@@ -65,80 +70,62 @@
   align-items: center;
 }
 
-.mode-card:hover {
+.player-card-select:hover {
   transform: translateY(-15px);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
   border-color: #4a90e2;
 }
 
-.mode-icon {
-  font-size: 5rem;
+.player-color-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
   margin-bottom: 1.5rem;
-  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 3px solid white;
 }
 
-.mode-card h2 {
+.player-card-select h3 {
   color: #2c3e50;
-  font-size: 1.6rem;
-  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
   font-weight: bold;
 }
 
-.mode-card p {
+.player-card-select p {
   color: #666;
-  margin-bottom: 1.8rem;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  min-height: 3rem;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
 }
 
-.mode-btn {
-  padding: 1rem 2rem;
-  font-size: 1.05rem;
-  font-weight: bold;
+.select-btn {
+  padding: 0.8rem 1.5rem;
+  background: linear-gradient(135deg, #45B7D1 0%, #0a8fa3 100%);
+  color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
   transition: all 0.3s ease;
-  color: white;
   width: 100%;
-}
-
-.local-btn {
-  background: linear-gradient(135deg, #4a90e2 0%, #2c5aa0 100%);
-  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
-}
-
-.local-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.6);
-}
-
-.online-btn {
-  background: linear-gradient(135deg, #45B7D1 0%, #0a8fa3 100%);
   box-shadow: 0 4px 15px rgba(69, 183, 209, 0.4);
 }
 
-.online-btn:hover {
+.select-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(69, 183, 209, 0.6);
 }
 
-.back-button-mode {
-  position: absolute;
-  top: 2rem;
-  left: 2rem;
-  padding: 0.8rem 1.5rem;
-  background: linear-gradient(135deg, #4a90e2 0%, #2c5aa0 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
+.no-players {
+  background: white;
+  border-radius: 16px;
+  padding: 3rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
-.back-button-mode:hover {
-  background: linear-gradient(135deg, #2c5aa0 0%, #1a3a60 100%);
-  transform: translateY(-2px);
+.no-players p {
+  color: #666;
+  font-size: 1.1rem;
 }

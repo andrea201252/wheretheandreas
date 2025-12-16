@@ -79,7 +79,25 @@
 .players-status > div {
   background: rgba(255, 255, 255, 0.2);
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 5px;
+}
+
+.connected-players {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  min-width: 200px;
+}
+
+.connected-players strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.connected-players > div {
+  padding: 0.3rem 0;
+  font-size: 0.9rem;
 }
 
 .back-button {

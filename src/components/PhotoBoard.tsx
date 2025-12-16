@@ -55,6 +55,22 @@ export default function PhotoBoard({
         backgroundPosition: 'center',
       }}
     >
+      {/* Rettangoli degli Andrea per debug/soluzione */}
+      {showSolution && andrews.map(andrea => (
+        <div
+          key={`rect-${andrea.id}`}
+          className="andrea-rectangle"
+          style={{
+            left: `${andrea.x}px`,
+            top: `${andrea.y}px`,
+            width: `${andrea.width}px`,
+            height: `${andrea.height}px`,
+          }}
+        >
+          <span className="andrea-label">Andrea {andrea.id}</span>
+        </div>
+      ))}
+
       {/* Arrows che puntano agli Andrea */}
       {(showSolution || foundAndreas.length > 0) && andrews.map(andrea => (
         <div

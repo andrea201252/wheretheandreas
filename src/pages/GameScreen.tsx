@@ -36,29 +36,29 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const [winner, setWinner] = useState<Player | null>(null)
   const [showWinPopup, setShowWinPopup] = useState(false)
   const [findersOrder, setFindersOrder] = useState<string[]>([]) // Ordine di chi ha trovato
-  const BUFFER = 50 // Buffer intorno alle coordinate
+  const BUFFER = 120 // Buffer intorno alle coordinate - aumentato per facilità di click
   
   // Configurazione Andrea per livelli con le coordinate corrette
   const andreasConfig: Record<number, AndreaLocation> = {
     1: {
-      andrea1: { id: 1, x: 1271 - BUFFER, y: 704 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
-      andrea2: { id: 2, x: 500 - BUFFER, y: 728 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea1: { id: 1, x: -1, y: 748, width: 191, height: 304, buffer: BUFFER },
+      andrea2: { id: 2, x: 938, y: 612, width: 122, height: 397, buffer: BUFFER },
     },
     2: {
-      andrea1: { id: 1, x: 1099 - BUFFER, y: 413 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
-      andrea2: { id: 2, x: 995 - BUFFER, y: 470 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea1: { id: 1, x: 613, y: 556, width: 76, height: 52, buffer: BUFFER },
+      andrea2: { id: 2, x: 751, y: 495, width: 82, height: 113, buffer: BUFFER },
     },
     3: {
-      andrea1: { id: 1, x: 1226 - BUFFER, y: 100 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
-      andrea2: { id: 2, x: 518 - BUFFER, y: 398 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea1: { id: 1, x: 58, y: 429, width: 88, height: 261, buffer: BUFFER },
+      andrea2: { id: 2, x: 904, y: 576, width: 198, height: 257, buffer: BUFFER },
     },
     4: {
-      andrea1: { id: 1, x: 847 - BUFFER, y: 775 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
-      andrea2: { id: 2, x: 512 - BUFFER, y: 737 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea1: { id: 1, x: 58, y: 887, width: 21, height: 38, buffer: BUFFER },
+      andrea2: { id: 2, x: 452, y: 806, width: 44, height: 161, buffer: BUFFER },
     },
     5: {
-      andrea1: { id: 1, x: 693 - BUFFER, y: 676 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
-      andrea2: { id: 2, x: 693 - BUFFER, y: 676 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea1: { id: 1, x: 118, y: 766, width: 282, height: 85, buffer: BUFFER },
+      andrea2: { id: 2, x: 177, y: 512, width: 63, height: 131, buffer: BUFFER },
     },
   }
 
@@ -107,14 +107,21 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
     const player = players.find(p => p.id === playerId)
     if (!player) return
 
+    // Log per debug
+    console.log(`Click at: x=${x}, y=${y}`)
+    console.log('Current Andreas:', currentAndreas)
+
     // Verifica se il click è su un Andrea
     for (const andrea of currentAndreas) {
+      console.log(`Checking Andrea ${andrea.id}: x=${andrea.x}-${andrea.x + andrea.width}, y=${andrea.y}-${andrea.y + andrea.height}`)
+      
       if (
         x >= andrea.x &&
         x <= andrea.x + andrea.width &&
         y >= andrea.y &&
         y <= andrea.y + andrea.height
       ) {
+        console.log(`HIT! Andrea ${andrea.id} found!`)
         if (!foundAndreas.includes(andrea.id)) {
           const newFound = [...foundAndreas, andrea.id]
           setFoundAndreas(newFound)
@@ -129,6 +136,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         return
       }
     }
+    console.log('No Andrea hit')
   }
 
   const handleShowSolution = () => {

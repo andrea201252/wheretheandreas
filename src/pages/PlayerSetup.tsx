@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Player } from '../App'
-import { createGameRoom, generateGameId } from '../services/gameService'
+import { createGameRoom, generateGameId, joinGameRoom } from '../services/gameService'
 import './PlayerSetup.css'
 
 const CURSOR_COLORS = [
@@ -11,9 +11,10 @@ const CURSOR_COLORS = [
 interface PlayerSetupProps {
   onPlayersSet: (players: Player[], gameId?: string) => void
   isOnline?: boolean
+  gameId?: string | null
 }
 
-export default function PlayerSetup({ onPlayersSet, isOnline = false }: PlayerSetupProps) {
+export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: initialGameId = null }: PlayerSetupProps) {
   const [view, setView] = useState<'setup' | 'sharing'>('setup')
   const [playerCount, setPlayerCount] = useState(2)
   const [players, setPlayers] = useState<Partial<Player>[]>(
@@ -24,7 +25,7 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false }: PlayerSe
       score: 0
     }))
   )
-  const [gameId, setGameId] = useState<string>('')
+  const [gameId, setGameId] = useState<string>(initialGameId || '')
 
   const handlePlayerCountChange = (count: number) => {
     setPlayerCount(count)
@@ -58,11 +59,19 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false }: PlayerSe
     }))
 
     if (isOnline) {
-      // Genera game ID e crea stanza online
-      const newGameId = generateGameId()
-      setGameId(newGameId)
-      await createGameRoom(newGameId, validPlayers)
-      setView('sharing')
+      if (initialGameId) {
+        // Unirsi a una partita esistente - aggiungi i giocatori
+        for (const player of validPlayers) {
+          await joinGameRoom(initialGameId, player)
+        }
+        onPlayersSet(validPlayers, initialGameId)
+      } else {
+        // Creare una nuova partita online
+        const newGameId = generateGameId()
+        setGameId(newGameId)
+        await createGameRoom(newGameId, validPlayers)
+        setView('sharing')
+      }
     } else {
       // Gioco locale
       onPlayersSet(validPlayers)

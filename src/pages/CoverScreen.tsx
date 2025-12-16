@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import './CoverScreen.css'
 
 interface CoverScreenProps {
-  onComplete: () => void
+  onComplete: (skipCover: boolean) => void
 }
 
 export default function CoverScreen({ onComplete }: CoverScreenProps) {
@@ -11,8 +11,8 @@ export default function CoverScreen({ onComplete }: CoverScreenProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false)
-      setTimeout(onComplete, 500) // Attendi l'animazione di fade out
-    }, 3000) // Mostra per 3 secondi
+      setTimeout(() => onComplete(false), 500) // Auto-complete after 5 seconds
+    }, 5000) // Mostra per 5 secondi
 
     return () => clearTimeout(timer)
   }, [onComplete])
@@ -20,7 +20,10 @@ export default function CoverScreen({ onComplete }: CoverScreenProps) {
   return (
     <div className={`cover-screen ${!isVisible ? 'fade-out' : ''}`}>
       <img src="/images/Copertina.png" alt="Cover" className="cover-image" />
-      <button onClick={() => onComplete()} className="skip-button">
+      <button onClick={() => onComplete(true)} className="start-button">
+        Start Game 🎮
+      </button>
+      <button onClick={() => onComplete(true)} className="skip-button">
         Skip ⏭️
       </button>
     </div>

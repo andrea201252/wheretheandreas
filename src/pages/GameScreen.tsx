@@ -3,6 +3,7 @@ import { Player } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
 import WinPopup from '../components/WinPopup'
+import Leaderboard from '../components/Leaderboard'
 import { updatePlayerScore, updateGameTime } from '../services/gameService'
 import './GameScreen.css'
 
@@ -20,6 +21,7 @@ interface Andrea {
   y: number
   width: number
   height: number
+  buffer: number
 }
 
 interface AndreaLocation {
@@ -33,28 +35,30 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const [foundAndreas, setFoundAndreas] = useState<number[]>([])
   const [winner, setWinner] = useState<Player | null>(null)
   const [showWinPopup, setShowWinPopup] = useState(false)
+  const [findersOrder, setFindersOrder] = useState<string[]>([]) // Ordine di chi ha trovato
+  const BUFFER = 50 // Buffer intorno alle coordinate
   
-  // Configurazione Andrea per livelli con coordinate per ogni Andrea
+  // Configurazione Andrea per livelli con le coordinate corrette
   const andreasConfig: Record<number, AndreaLocation> = {
     1: {
-      andrea1: { id: 1, x: 0, y: 0, width: 80, height: 100 },
-      andrea2: { id: 2, x: 0, y: 0, width: 70, height: 90 },
+      andrea1: { id: 1, x: 1271 - BUFFER, y: 704 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea2: { id: 2, x: 500 - BUFFER, y: 728 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
     },
     2: {
-      andrea1: { id: 1, x: 0, y: 0, width: 60, height: 80 },
-      andrea2: { id: 2, x: 0, y: 0, width: 75, height: 95 },
+      andrea1: { id: 1, x: 1099 - BUFFER, y: 413 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea2: { id: 2, x: 995 - BUFFER, y: 470 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
     },
     3: {
-      andrea1: { id: 1, x: 0, y: 0, width: 70, height: 85 },
-      andrea2: { id: 2, x: 0, y: 0, width: 80, height: 100 },
+      andrea1: { id: 1, x: 1226 - BUFFER, y: 100 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea2: { id: 2, x: 518 - BUFFER, y: 398 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
     },
     4: {
-      andrea1: { id: 1, x: 0, y: 0, width: 75, height: 90 },
-      andrea2: { id: 2, x: 0, y: 0, width: 70, height: 95 },
+      andrea1: { id: 1, x: 847 - BUFFER, y: 775 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea2: { id: 2, x: 512 - BUFFER, y: 737 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
     },
     5: {
-      andrea1: { id: 1, x: 0, y: 0, width: 80, height: 100 },
-      andrea2: { id: 2, x: 0, y: 0, width: 75, height: 95 },
+      andrea1: { id: 1, x: 693 - BUFFER, y: 676 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
+      andrea2: { id: 2, x: 693 - BUFFER, y: 676 - BUFFER, width: BUFFER * 2, height: BUFFER * 2, buffer: BUFFER },
     },
   }
 
@@ -100,6 +104,9 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   const handlePhotoClick = (x: number, y: number, playerId: string) => {
     if (showSolution || winner) return
 
+    const player = players.find(p => p.id === playerId)
+    if (!player) return
+
     // Verifica se il click è su un Andrea
     for (const andrea of currentAndreas) {
       if (
@@ -111,14 +118,12 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
         if (!foundAndreas.includes(andrea.id)) {
           const newFound = [...foundAndreas, andrea.id]
           setFoundAndreas(newFound)
+          setFindersOrder([...findersOrder, playerId])
           
           // Se trovi entrambi, mostra il popup di vittoria
           if (newFound.length === 2) {
-            const winningPlayer = players.find(p => p.id === playerId)
-            if (winningPlayer) {
-              setWinner(winningPlayer)
-              setShowWinPopup(true)
-            }
+            setWinner(player)
+            setShowWinPopup(true)
           }
         }
         return
@@ -132,6 +137,12 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
 
   return (
     <div className="game-screen">
+      {winner && !showSolution && (
+        <div className="celebration-message">
+          <span>Great {winner.name} You Find them!</span>
+        </div>
+      )}
+
       <div className="game-header">
         <h2>Level {level}</h2>
         <GameTimer timeLeft={timeLeft} />
@@ -157,6 +168,8 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
           players={players}
         />
       </div>
+
+      <Leaderboard finders={findersOrder} players={players} />
 
       {showWinPopup && winner && (
         <WinPopup player={winner} onClose={() => setShowWinPopup(false)} />

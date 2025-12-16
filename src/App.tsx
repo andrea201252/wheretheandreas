@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import CoverScreen from './pages/CoverScreen'
 import IntroScreen from './pages/IntroScreen'
 import GameModeScreen from './pages/GameModeScreen'
 import PlayerSetup from './pages/PlayerSetup'
 import GameScreen from './pages/GameScreen'
+import LevelIntroScreen from './pages/LevelIntroScreen'
 import './App.css'
 
 export interface Player {
@@ -12,14 +14,18 @@ export interface Player {
   score: number
 }
 
-type AppState = 'intro' | 'gameMode' | 'playerSetup' | 'playing' | 'levelComplete' | 'gameEnd'
+type AppState = 'cover' | 'intro' | 'gameMode' | 'playerSetup' | 'levelIntro' | 'playing' | 'levelComplete' | 'gameEnd'
 
 function App() {
-  const [appState, setAppState] = useState<AppState>('intro')
+  const [appState, setAppState] = useState<AppState>('cover')
   const [currentLevel, setCurrentLevel] = useState(1)
   const [players, setPlayers] = useState<Player[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameMode, setGameMode] = useState<'local' | 'online' | null>(null)
+
+  const handleCoverComplete = () => {
+    setAppState('intro')
+  }
 
   const handleStartGame = () => {
     setAppState('gameMode')
@@ -35,8 +41,12 @@ function App() {
     if (gId) {
       setGameId(gId)
     }
-    setAppState('playing')
     setCurrentLevel(1)
+    setAppState('levelIntro')
+  }
+
+  const handleLevelIntroComplete = () => {
+    setAppState('playing')
   }
 
   const handleLevelComplete = (winnerId?: string) => {
@@ -53,7 +63,7 @@ function App() {
       setAppState('gameEnd')
     } else {
       setCurrentLevel(prev => prev + 1)
-      setAppState('playing')
+      setAppState('levelIntro')
     }
   }
 
@@ -67,6 +77,7 @@ function App() {
 
   return (
     <div className="app">
+      {appState === 'cover' && <CoverScreen onComplete={handleCoverComplete} />}
       {appState === 'intro' && <IntroScreen onStart={handleStartGame} />}
       {appState === 'gameMode' && (
         <GameModeScreen 
@@ -78,6 +89,12 @@ function App() {
         <PlayerSetup 
           onPlayersSet={handlePlayersSet}
           isOnline={gameMode === 'online'}
+        />
+      )}
+      {appState === 'levelIntro' && (
+        <LevelIntroScreen 
+          level={currentLevel}
+          onStart={handleLevelIntroComplete}
         />
       )}
       {appState === 'playing' && (

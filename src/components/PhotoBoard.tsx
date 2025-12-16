@@ -8,6 +8,7 @@ interface Andrea {
   y: number
   width: number
   height: number
+  buffer?: number
 }
 
 interface PhotoBoardProps {
@@ -44,22 +45,16 @@ export default function PhotoBoard({
   }
 
   return (
-    <div 
+      <div 
       className="photo-board" 
       onClick={handleClick}
       style={{
-        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${players[activePlayerIndex].cursorColor}"/></svg>') 16 16, auto`
+        cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="${players[activePlayerIndex].cursorColor}"/></svg>') 16 16, auto`,
+        backgroundImage: `url('/images/level${level}.jpeg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
       }}
     >
-      {/* Placeholder per l'immagine */}
-      <div className="photo-placeholder">
-        <p>Photo Level {level}</p>
-        <p className="small-text">(Upload your photo here)</p>
-        <div className="current-player" style={{ color: players[activePlayerIndex].cursorColor }}>
-          Current: {players[activePlayerIndex].name}
-        </div>
-      </div>
-
       {/* Arrows che puntano agli Andrea */}
       {(showSolution || foundAndreas.length > 0) && andrews.map(andrea => (
         <div
@@ -87,6 +82,11 @@ export default function PhotoBoard({
           }}
         />
       ))}
+
+      {/* Current player indicator */}
+      <div className="current-player-badge" style={{ color: players[activePlayerIndex].cursorColor }}>
+        🎮 {players[activePlayerIndex].name}
+      </div>
     </div>
   )
 }

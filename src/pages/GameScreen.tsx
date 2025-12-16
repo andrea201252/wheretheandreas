@@ -2,7 +2,6 @@
 import { Player, WinnerData } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
-import WinPopup from '../components/WinPopup'
 import Leaderboard from '../components/Leaderboard'
 import { updatePlayerScore, updateGameTime, onPlayersUpdate } from '../services/gameService'
 import { isPointInPolygon, htmlPolygonToPolygon, Point, Polygon } from '../utils/polygonUtils'
@@ -75,7 +74,6 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
 
   const currentAndreaLocations = andreasConfig[level] || andreasConfig[1]
   const currentAndreas = [currentAndreaLocations.andrea1, currentAndreaLocations.andrea2]
-  const currentPlayer = players.find(p => p.id === currentPlayerId) || players[0]
 
   // Sincronizza i giocatori online
   useEffect(() => {

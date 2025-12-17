@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Player } from '../App'
-import { createGameRoom, generateGameId, joinGameRoom, getClientId } from '../services/gameService'
+import { createGameRoom, generateGameId, getClientId } from '../services/gameService'
 import './PlayerSetup.css'
 
 const CURSOR_COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', 
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
   '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'
 ]
 
@@ -14,18 +14,20 @@ interface PlayerSetupProps {
   gameId?: string | null
 }
 
-export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: initialGameId = null }: PlayerSetupProps) {
-  const [view, setView] = useState<'setup' | 'sharing'>('setup')
+export default function PlayerSetup({
+  onPlayersSet,
+  isOnline = false,
+  gameId: initialGameId = null
+}: PlayerSetupProps) {
   const [playerCount, setPlayerCount] = useState(2)
   const [players, setPlayers] = useState<Partial<Player>[]>(
     Array(2).fill(null).map((_, i) => ({
       id: `player-${i}`,
       name: `Player ${i + 1}`,
-      cursorColor: CURSOR_COLORS[i],
+      cursorColor: CURSOR_COLORS[i % CURSOR_COLORS.length],
       score: 0
     }))
   )
-  const [gameId, setGameId] = useState<string>(initialGameId || '')
 
   const handlePlayerCountChange = (count: number) => {
     setPlayerCount(count)
@@ -51,7 +53,7 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: in
   }
 
   const handleStartGame = async () => {
-    const validPlayers = players.map((p, i) => ({
+    const validPlayers: Player[] = players.map((p, i) => ({
       id: p.id || `player-${i}`,
       name: p.name || `Player ${i + 1}`,
       cursorColor: p.cursorColor || CURSOR_COLORS[i % CURSOR_COLORS.length],
@@ -59,73 +61,28 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: in
     }))
 
     if (isOnline) {
-      if (initialGameId) {
-        // Unirsi a una partita esistente - aggiungi i giocatori
-        for (const player of validPlayers) {
-          await joinGameRoom(initialGameId, player)
-        }
-        onPlayersSet(validPlayers, initialGameId)
-      } else {
-        // Creare una nuova partita online
-        const newGameId = generateGameId()
-        setGameId(newGameId)
-        await createGameRoom(newGameId, validPlayers, getClientId())
+      // CREATE ROOM (host = questo clientId)
+      const gId = initialGameId || generateGameId()
+      await createGameRoom(gId, validPlayers, getClientId())
 
-        // Entra subito nella room e scegli il personaggio (anti-duplica via claims)
-        onPlayersSet(validPlayers, newGameId)
-      }
-    } else {
-      // Gioco locale
-      onPlayersSet(validPlayers)
+      // host entra subito nel flusso: App -> selectPlayer
+      onPlayersSet(validPlayers, gId)
+      return
     }
-  }
 
-  const handleCopyLink = () => {
-    const gameLink = `${window.location.origin}?gameId=${gameId}`
-    navigator.clipboard.writeText(gameLink)
-    alert('Link copiato! Condividilo con gli altri giocatori.')
-  }
-
-  const handleStartOnlineGame = () => {
-    const validPlayers = players.map((p, i) => ({
-      id: p.id || `player-${i}`,
-      name: p.name || `Player ${i + 1}`,
-      cursorColor: p.cursorColor || CURSOR_COLORS[i % CURSOR_COLORS.length],
-      score: 0
-    }))
-    onPlayersSet(validPlayers, gameId)
-  }
-
-  if (view === 'sharing' && isOnline) {
-    return (
-      <div className="player-setup">
-        <div className="setup-container sharing-view">
-          <h1>Game Created! 🎮</h1>
-          <p className="game-id-label">Game ID:</p>
-          <div className="game-id-display">
-            <code>{gameId}</code>
-            <button onClick={handleCopyLink} className="copy-btn">
-              Copy Link
-            </button>
-          </div>
-          <p className="sharing-info">Share this ID with your friends to join the game!</p>
-          <button className="start-btn" onClick={handleStartOnlineGame}>
-            Start Game
-          </button>
-        </div>
-      </div>
-    )
+    // LOCALE
+    onPlayersSet(validPlayers)
   }
 
   return (
     <div className="player-setup">
       <div className="setup-container">
         <h1>Player Setup</h1>
-        
+
         <div className="player-count-section">
           <label>Number of Players:</label>
           <div className="player-count-buttons">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(count => (
+            {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map((count) => (
               <button
                 key={count}
                 className={`count-btn ${playerCount === count ? 'active' : ''}`}
@@ -153,7 +110,7 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: in
               <div className="form-group">
                 <label>Cursor Color:</label>
                 <div className="color-picker">
-                  {CURSOR_COLORS.map(color => (
+                  {CURSOR_COLORS.map((color) => (
                     <button
                       key={color}
                       className={`color-btn ${player.cursorColor === color ? 'selected' : ''}`}
@@ -168,7 +125,7 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: in
           ))}
         </div>
 
-        <button className="start-btn" onClick={handleStartGame}>
+        <button className="start-btn" onClick={() => { void handleStartGame() }}>
           Start Game
         </button>
       </div>

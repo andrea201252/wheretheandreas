@@ -3,7 +3,7 @@ import { Player, WinnerData } from '../App'
 import GameTimer from '../components/GameTimer'
 import PhotoBoard from '../components/PhotoBoard'
 import Leaderboard from '../components/Leaderboard'
-import { updatePlayerScore, updateGameTime, onPlayersUpdate } from '../services/gameService'
+import { submitLevelResult, updateGameTime, onPlayersUpdate } from '../services/gameService'
 import { isPointInPolygon, htmlPolygonToPolygon, Point, Polygon } from '../utils/polygonUtils'
 import './GameScreen.css'
 
@@ -176,12 +176,15 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
   }
 
   const handleContinue = async () => {
-    if (showWinPopup && gameId) {
-      const updatedScore = (displayPlayers.find(p => p.id === showWinPopup.playerId)?.score || 0) + 10
-      console.log(`Updating score for ${showWinPopup.playerId}: ${updatedScore}`)
-      await updatePlayerScore(gameId, showWinPopup.playerId, updatedScore).catch(err =>
-        console.error('Errore update score:', err)
-      )
+    // Online: salva SEMPRE un risultato per questo player (serve per ranking/punti)
+    if (gameId && currentPlayerId) {
+      const isWinner = !!showWinPopup
+      const time = isWinner ? showWinPopup!.time : 30
+      await submitLevelResult(gameId, level, currentPlayerId, {
+        time,
+        found: isWinner,
+        submittedAt: Date.now()
+      }).catch(err => console.error('Errore submit result:', err))
     }
     // Passa i dati del vincitore a App.tsx
     if (showWinPopup) {

@@ -4,41 +4,65 @@ import './GameEndScreen.css'
 interface GameEndScreenProps {
   players: Player[]
   levelWinners: WinnerData[]
+  levelPlacements?: Record<number, any>
   onPlayAgain: () => void
 }
 
-export default function GameEndScreen({ players, levelWinners, onPlayAgain }: GameEndScreenProps) {
-  // Conta le vittorie per giocatore
-  const winCounts = levelWinners.reduce((acc, winner) => {
+export default function GameEndScreen({ players, levelWinners, levelPlacements, onPlayAgain }: GameEndScreenProps) {
+  // Se ho i piazzamenti per livello, li uso come fonte di verità.
+  const winnersFromPlacements: WinnerData[] = (() => {
+    if (!levelPlacements) return []
+    const out: WinnerData[] = []
+    Object.entries(levelPlacements).forEach(([k, v]) => {
+      const level = Number(k)
+      const placements = v?.placements || []
+      const first = placements[0]
+      if (first && Number.isFinite(level)) {
+        out.push({
+          level,
+          playerId: first.playerId,
+          playerName: first.playerName,
+          time: first.time
+        })
+      }
+    })
+    return out
+  })()
+
+  const effectiveLevelWinners = winnersFromPlacements.length ? winnersFromPlacements : levelWinners
+
+  // Conta le vittorie (#1 di livello) per giocatore
+  const winCounts = effectiveLevelWinners.reduce((acc, winner) => {
     acc[winner.playerId] = (acc[winner.playerId] || 0) + 1
     return acc
   }, {} as Record<string, number>)
 
-  // Ordina i giocatori per numero di vittorie (primo, secondo, terzo)
+  // Ordina: punti desc, poi vittorie desc
   const rankedPlayers = [...players].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
     const aWins = winCounts[a.id] || 0
     const bWins = winCounts[b.id] || 0
     return bWins - aWins
   })
 
-  // Medaglie
+  // Badge piazzamento
   const getMedal = (rank: number) => {
     switch (rank) {
       case 0:
-        return '🥇'
+        return '1st'
       case 1:
-        return '🥈'
+        return '2nd'
       case 2:
-        return '🥉'
+        return '3rd'
       default:
-        return '🎖️'
+        return ''
     }
   }
 
   return (
     <div className="game-end-screen">
       <div className="game-end-container">
-        <h1 className="game-end-title">🎉 Game Over! 🎉</h1>
+        <h1 className="game-end-title">Game Over</h1>
         
         <div className="winner-podium">
           {rankedPlayers.slice(0, 3).map((player, idx) => (
@@ -76,10 +100,10 @@ export default function GameEndScreen({ players, levelWinners, onPlayAgain }: Ga
         )}
 
         <div className="level-winners-detail">
-          <h3>Level Winners by Speed</h3>
+          <h3>Level Winners</h3>
           <div className="winners-table">
             {[1, 2, 3, 4, 5].map(level => {
-              const levelWinner = levelWinners.find(w => w.level === level)
+              const levelWinner = effectiveLevelWinners.find(w => w.level === level)
               return (
                 <div key={level} className="winner-row">
                   <span className="level-label">Level {level}:</span>

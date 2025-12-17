@@ -146,6 +146,12 @@
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
+.level-intro-hint {
+  margin-top: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
 .level-start-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);

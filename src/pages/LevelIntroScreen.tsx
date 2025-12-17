@@ -4,9 +4,11 @@ interface LevelIntroScreenProps {
   level: number
   onStart: () => void
   onBack: () => void
+  canStart?: boolean
+  hintText?: string
 }
 
-export default function LevelIntroScreen({ level, onStart, onBack }: LevelIntroScreenProps) {
+export default function LevelIntroScreen({ level, onStart, onBack, canStart = true, hintText }: LevelIntroScreenProps) {
   const getIntroImage = () => {
     return `/images/intro.jpeg`
   }
@@ -36,7 +38,14 @@ export default function LevelIntroScreen({ level, onStart, onBack }: LevelIntroS
             </ul>
           </div>
           
-          <button onClick={onStart} className="level-start-button">
+          {hintText && <p className="level-intro-hint">{hintText}</p>}
+
+          <button
+            onClick={onStart}
+            className="level-start-button"
+            disabled={!canStart}
+            style={!canStart ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+          >
             Start Level {level}
           </button>
         </div>

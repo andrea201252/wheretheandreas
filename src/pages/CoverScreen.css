@@ -61,11 +61,13 @@
 }
 
 .cover-image {
-  max-width: 80vw;
-  max-height: 80vh;
+  width: min(95vw, 980px);
+  height: auto;
+  max-height: calc(100vh - 220px);
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  flex: 1 1 auto;
 }
 
 .cover-start-button {

@@ -1,5 +1,5 @@
 ﻿import { initializeApp } from 'firebase/app'
-import { getDatabase, ref, set, onValue, update, remove, get } from 'firebase/database'
+import { getDatabase, ref, set, onValue, update, remove, get, onDisconnect } from 'firebase/database'
 import { Player } from '../App'
 
 const firebaseConfig = {
@@ -25,10 +25,12 @@ export const generateGameId = () => {
 export const createGameRoom = async (gameId: string, players: Player[]) => {
   const gameData = {
     gameId,
+    hostId: players[0]?.id || null,
     players: {},
     level: 1,
     timeLeft: 30,
     status: 'waiting',
+    phase: 'levelIntro',
     createdAt: Date.now(),
     winnerId: null
   }
@@ -96,6 +98,14 @@ export const updateGameStatus = async (gameId: string, status: 'waiting' | 'play
   await update(ref(db, `games/${gameId}`), { status })
 }
 
+// Aggiorna la fase (screen) condivisa della partita
+export const updateGamePhase = async (
+  gameId: string,
+  phase: 'levelIntro' | 'playing' | 'gameEnd'
+) => {
+  await update(ref(db, `games/${gameId}`), { phase })
+}
+
 // Ottieni una partita specifica
 export const getGameRoom = async (gameId: string) => {
   try {
@@ -119,4 +129,117 @@ export const onPlayersUpdate = (gameId: string, callback: (players: any) => void
       callback(snapshot.val())
     }
   })
+}
+
+// =========================
+// CURSORI MULTI-PLAYER
+// =========================
+
+export type CursorPayload = {
+  // coordinate normalizzate (0-1) sul viewport locale
+  x: number
+  y: number
+  ts: number
+}
+
+export const updatePlayerCursor = async (gameId: string, playerId: string, cursor: CursorPayload) => {
+  await set(ref(db, `games/${gameId}/cursors/${playerId}`), cursor)
+}
+
+export const removePlayerCursor = async (gameId: string, playerId: string) => {
+  await remove(ref(db, `games/${gameId}/cursors/${playerId}`))
+}
+
+export const attachCursorDisconnectCleanup = async (gameId: string, playerId: string) => {
+  // Quando la connessione cade, rimuove il cursore
+  try {
+    await onDisconnect(ref(db, `games/${gameId}/cursors/${playerId}`)).remove()
+  } catch (e) {
+    // Non bloccare l'app se onDisconnect fallisce (capita su alcuni browser)
+    console.warn('onDisconnect cursor cleanup failed:', e)
+  }
+}
+
+export const onCursorsUpdate = (gameId: string, callback: (cursors: any) => void) => {
+  return onValue(ref(db, `games/${gameId}/cursors`), (snapshot) => {
+    callback(snapshot.exists() ? snapshot.val() : {})
+  })
+}
+
+// =========================
+// RISULTATI PER LIVELLO + PUNTEGGI
+// =========================
+
+export type LevelResult = {
+  time: number // secondi impiegati (o 30 se non trovato)
+  found: boolean
+  submittedAt: number
+}
+
+export const submitLevelResult = async (
+  gameId: string,
+  level: number,
+  playerId: string,
+  result: LevelResult
+) => {
+  await set(ref(db, `games/${gameId}/levelResults/${level}/${playerId}`), result)
+}
+
+export const onLevelResultsUpdate = (
+  gameId: string,
+  level: number,
+  callback: (results: any) => void
+) => {
+  return onValue(ref(db, `games/${gameId}/levelResults/${level}`), (snapshot) => {
+    callback(snapshot.exists() ? snapshot.val() : {})
+  })
+}
+
+export const isLevelProcessed = async (gameId: string, level: number) => {
+  const snap = await get(ref(db, `games/${gameId}/processedLevels/${level}`))
+  return snap.exists()
+}
+
+export type PlacementRow = {
+  playerId: string
+  playerName: string
+  rank: number
+  time: number
+  found: boolean
+  points: number
+}
+
+export const finalizeLevel = async (
+  gameId: string,
+  level: number,
+  placements: PlacementRow[],
+  scoreUpdates: Record<string, number>,
+  next: { phase: 'levelIntro' | 'gameEnd'; level?: number; status: 'waiting' | 'playing' | 'completed' }
+) => {
+  const updates: any = {}
+
+  // guard idempotenza
+  updates[`processedLevels/${level}`] = Date.now()
+
+  // salva piazzamenti
+  updates[`levelPlacements/${level}`] = {
+    processedAt: Date.now(),
+    placements
+  }
+
+  // aggiorna punteggi
+  Object.entries(scoreUpdates).forEach(([playerId, newScore]) => {
+    updates[`players/${playerId}/score`] = newScore
+  })
+
+  // avanzamento partita
+  updates['phase'] = next.phase
+  updates['status'] = next.status
+  if (typeof next.level === 'number') {
+    updates['level'] = next.level
+    updates['timeLeft'] = 30
+    updates['winnerId'] = null
+  }
+
+  await update(ref(db, `games/${gameId}`), updates)
 }

@@ -7,35 +7,51 @@ interface SelectPlayerScreenProps {
   onBackToMode: () => void
 }
 
-export default function SelectPlayerScreen({ availablePlayers, onSelectPlayer, onBackToMode }: SelectPlayerScreenProps) {
+export default function SelectPlayerScreen({
+  availablePlayers,
+  onSelectPlayer,
+  onBackToMode
+}: SelectPlayerScreenProps) {
   return (
     <div className="select-player-screen">
       <button onClick={onBackToMode} className="back-button-select">
-         Back
+        Back
       </button>
-      
-      <div className="select-player-container">
-        <h1> Join the Game!</h1>
-        <p>Select which player you are:</p>
-        
+
+      <div className="select-container">
+        <h1>Select Your Player</h1>
+        <p className="subtitle">A player can only be selected by one person.</p>
+
         <div className="players-grid">
-          {availablePlayers.map(player => (
-            <div 
+          {availablePlayers.map((player) => (
+            <div
               key={player.id}
               className="player-card-select"
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectPlayer(player)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') onSelectPlayer(player)
+              }}
             >
-              <div className="player-color-circle" style={{ backgroundColor: player.cursorColor }}></div>
-              <h3>{player.name}</h3>
+              <h2>{player.name}</h2>
               <p>Score: {player.score}</p>
-              <button className="select-btn">Join as {player.name}</button>
+              <button
+                className="select-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSelectPlayer(player)
+                }}
+              >
+                Join as {player.name}
+              </button>
             </div>
           ))}
         </div>
-        
+
         {availablePlayers.length === 0 && (
           <div className="no-players">
-            <p>No players available in this game.</p>
+            <p>No players available. All slots are already taken.</p>
           </div>
         )}
       </div>

@@ -14,6 +14,9 @@ import {
   isLevelProcessed,
   onGameUpdates,
   onLevelResultsUpdate,
+  claimPlayerSlot,
+  releasePlayerSlot,
+  getClientId,
   updateGamePhase,
   updateGameStatus
 } from './services/gameService'
@@ -43,6 +46,8 @@ function App() {
   const [gameMode, setGameMode] = useState<'local' | 'create' | 'join' | null>(null)
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]) // Giocatori disponibili quando aderisci
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null) // Giocatore corrente
+
+  const clientId = useMemo(() => getClientId(), [])
   const [levelWinners, setLevelWinners] = useState<WinnerData[]>([]) // Traccia i vincitori di ogni livello
   const [levelWinnersCount, setLevelWinnersCount] = useState<Record<number, number>>({}) // Conta vincitori per livello
 
@@ -53,7 +58,13 @@ function App() {
 
   const isOnline = useMemo(() => !!gameId && (gameMode === 'create' || gameMode === 'join'), [gameId, gameMode])
   const hostId = useMemo(() => (gameRoom?.hostId as string | null) ?? null, [gameRoom])
-  const isHost = useMemo(() => !!hostId && !!selectedPlayerId && hostId === selectedPlayerId, [hostId, selectedPlayerId])
+  const isHost = useMemo(
+    () => (
+      (!!hostClientId && hostClientId === clientId) ||
+      (!!hostId && !!selectedPlayerId && hostId === selectedPlayerId)
+    ),
+    [hostClientId, clientId, hostId, selectedPlayerId]
+  )
 
   const pointsForRank = (rank: number) => {
     if (rank === 1) return 10
@@ -85,6 +96,14 @@ function App() {
           score: p.score || 0
         })) as Player[]
         setPlayers(syncedPlayers)
+
+        // Player slot claims (anti-duplica): mostra solo quelli non presi o presi da questo client
+        const claims = (data as any)?.claims || {}
+        const filteredAvailable = syncedPlayers.filter((p) => {
+          const claimedBy = claims?.[p.id]
+          return !claimedBy || claimedBy === clientId
+        })
+        setAvailablePlayers(filteredAvailable)
       }
 
       if (typeof data?.level === 'number') {
@@ -273,10 +292,26 @@ function App() {
       })
   }
 
-  const handleSelectPlayer = (selectedPlayer: Player) => {
+  const handleSelectPlayer = async (selectedPlayer: Player) => {
+    // ONLINE: claim atomico del player slot (evita doppia selezione)
+    if (gameId && isOnline) {
+      const ok = await claimPlayerSlot(gameId, selectedPlayer.id, clientId)
+      if (!ok) {
+        // slot preso da un altro client: resta in select
+        return
+      }
+      // aggiorna URL per condivisione (host o join)
+      try {
+        const params = new URLSearchParams(window.location.search)
+        params.set('gameId', gameId)
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+      } catch {}
+    }
+
     // L'utente ha selezionato quale giocatore incarnare
     setPlayers([selectedPlayer])
     setSelectedPlayerId(selectedPlayer.id)
+
     // In online il flusso è pilotato dalla room (phase); fallback: levelIntro
     if (gameId) {
       setAppState('levelIntro')
@@ -287,14 +322,27 @@ function App() {
 
   const handlePlayersSet = (newPlayers: Player[], gId?: string) => {
     setPlayers(newPlayers)
-    // In modalità locale, il primo giocatore è quello attuale
-    setSelectedPlayerId(newPlayers[0]?.id || null)
+
+    // ONLINE (create): non auto-selezionare il primo player.
     if (gId) {
       setGameId(gId)
-      // online: la room deve avere una phase condivisa
-      updateGamePhase(gId, 'levelIntro').catch(() => {})
-      updateGameStatus(gId, 'playing').catch(() => {})
+      setAvailablePlayers(newPlayers)
+      setSelectedPlayerId(null)
+
+      // URL shareable
+      try {
+        const params = new URLSearchParams(window.location.search)
+        params.set('gameId', gId)
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+      } catch {}
+
+      setCurrentLevel(1)
+      setAppState('selectPlayer')
+      return
     }
+
+    // LOCALE: il primo giocatore è quello attuale
+    setSelectedPlayerId(newPlayers[0]?.id || null)
     setCurrentLevel(1)
     setAppState('levelIntro')
   }
@@ -373,6 +421,18 @@ function App() {
     setLevelWinnersCount({})
   }
 
+
+  const resetToMode = async () => {
+    if (gameId && isOnline && selectedPlayerId) {
+      try { await releasePlayerSlot(gameId, selectedPlayerId, clientId) } catch {}
+    }
+    setAppState('gameMode')
+    setGameId(null)
+    setGameMode(null)
+    setAvailablePlayers([])
+    setSelectedPlayerId(null)
+  }
+
   return (
     <div className="app">
       {isOnline && gameId && selectedPlayerId && players.length > 0 && (
@@ -388,19 +448,14 @@ function App() {
       {appState === 'joinGame' && (
         <JoinGameScreen
           onJoinGame={handleJoinGame}
-          onBackToMode={() => setAppState('gameMode')}
+          onBackToMode={() => { void resetToMode() }}
         />
       )}
       {appState === 'selectPlayer' && (
         <SelectPlayerScreen
           availablePlayers={availablePlayers}
           onSelectPlayer={handleSelectPlayer}
-          onBackToMode={() => {
-            setAppState('gameMode')
-            setGameId(null)
-            setGameMode(null)
-            setAvailablePlayers([])
-          }}
+          onBackToMode={() => { void resetToMode() }}
         />
       )}
       {appState === 'playerSetup' && (

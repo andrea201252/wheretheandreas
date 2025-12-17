@@ -1,5 +1,5 @@
 ﻿import { initializeApp } from 'firebase/app'
-import { getDatabase, ref, set, onValue, update, remove, get, onDisconnect } from 'firebase/database'
+import { getDatabase, ref, set, onValue, update, remove, get, onDisconnect, runTransaction } from 'firebase/database'
 import { Player } from '../App'
 
 const firebaseConfig = {
@@ -16,16 +16,78 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const db = getDatabase(app)
 
+
+// =========================
+// CLIENT ID (persistente per browser)
+// =========================
+const CLIENT_ID_KEY = 'wataa_client_id'
+
+export const getClientId = (): string => {
+  try {
+    const existing = localStorage.getItem(CLIENT_ID_KEY)
+    if (existing) return existing
+    const id =
+      Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36).slice(2, 8)
+    localStorage.setItem(CLIENT_ID_KEY, id)
+    return id
+  } catch {
+    // fallback senza storage
+    return Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36).slice(2, 8)
+  }
+}
+
+// =========================
+// PLAYER SLOT CLAIM (anti-duplica online)
+// games/{gameId}/claims/{playerId} = clientId
+// =========================
+export const claimPlayerSlot = async (gameId: string, playerId: string, clientId: string): Promise<boolean> => {
+  const claimRef = ref(db, `games/${gameId}/claims/${playerId}`)
+  const result = await runTransaction(
+    claimRef,
+    (current) => {
+      if (current === null) return clientId
+      if (current === clientId) return current
+      // slot già preso
+      return
+    },
+    { applyLocally: false }
+  )
+
+  if (!result.committed) return false
+
+  // Rilascia automaticamente se il client si disconnette
+  try {
+    await onDisconnect(claimRef).remove()
+  } catch {
+    // ignora
+  }
+  return true
+}
+
+export const releasePlayerSlot = async (gameId: string, playerId: string, clientId: string): Promise<void> => {
+  const claimRef = ref(db, `games/${gameId}/claims/${playerId}`)
+  await runTransaction(
+    claimRef,
+    (current) => {
+      if (current === clientId) return null
+      return current
+    },
+    { applyLocally: false }
+  )
+}
+
+
 // Genera ID partita casuale
 export const generateGameId = () => {
   return Math.random().toString(36).substring(2, 11).toUpperCase()
 }
 
 // Crea nuova stanza di gioco
-export const createGameRoom = async (gameId: string, players: Player[]) => {
+export const createGameRoom = async (gameId: string, players: Player[], hostClientId?: string) => {
   const gameData = {
     gameId,
     hostId: players[0]?.id || null,
+    hostClientId: hostClientId || null,
     players: {},
     level: 1,
     timeLeft: 30,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Player } from '../App'
-import { createGameRoom, generateGameId, joinGameRoom } from '../services/gameService'
+import { createGameRoom, generateGameId, joinGameRoom, getClientId } from '../services/gameService'
 import './PlayerSetup.css'
 
 const CURSOR_COLORS = [
@@ -69,8 +69,10 @@ export default function PlayerSetup({ onPlayersSet, isOnline = false, gameId: in
         // Creare una nuova partita online
         const newGameId = generateGameId()
         setGameId(newGameId)
-        await createGameRoom(newGameId, validPlayers)
-        setView('sharing')
+        await createGameRoom(newGameId, validPlayers, getClientId())
+
+        // Entra subito nella room e scegli il personaggio (anti-duplica via claims)
+        onPlayersSet(validPlayers, newGameId)
       }
     } else {
       // Gioco locale

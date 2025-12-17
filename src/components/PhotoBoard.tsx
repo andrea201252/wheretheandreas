@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 import { Player } from "../App"
 import { Polygon } from "../utils/polygonUtils"
 import "./PhotoBoard.css"
@@ -17,6 +17,31 @@ interface PhotoBoardProps {
   currentPlayerId?: string
 }
 
+type Size = { w: number; h: number }
+type StageLayout = { left: number; top: number; w: number; h: number }
+
+function computeStageLayout(container: Size, natural: Size): StageLayout {
+  if (container.w <= 0 || container.h <= 0 || natural.w <= 0 || natural.h <= 0) {
+    return { left: 0, top: 0, w: container.w || 0, h: container.h || 0 }
+  }
+
+  const imgAR = natural.w / natural.h
+  const boxAR = container.w / container.h
+
+  // "contain": l'immagine entra nel box senza crop.
+  if (imgAR > boxAR) {
+    // limitata dalla larghezza
+    const w = container.w
+    const h = container.w / imgAR
+    return { left: 0, top: (container.h - h) / 2, w, h }
+  }
+
+  // limitata dall'altezza
+  const h = container.h
+  const w = container.h * imgAR
+  return { left: (container.w - w) / 2, top: 0, w, h }
+}
+
 export default function PhotoBoard({
   level,
   onPhotoClick,
@@ -25,194 +50,168 @@ export default function PhotoBoard({
   players,
   currentPlayerId
 }: PhotoBoardProps) {
-  const [clickPositions, setClickPositions] = useState<{ x: number; y: number; playerId: string }[]>([])
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, naturalWidth: 0, naturalHeight: 0 })
-  const imgRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  
-  const currentPlayer = currentPlayerId ? players.find(p => p.id === currentPlayerId) : players[0]
+  const stageRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
 
-  // Quando l"immagine è caricata, salva le dimensioni
+  const [natural, setNatural] = useState<Size>({ w: 0, h: 0 })
+  const [containerSize, setContainerSize] = useState<Size>({ w: 0, h: 0 })
+  const [clickPositions, setClickPositions] = useState<Array<{ x: number; y: number; playerId: string }>>([])
+
+  const currentPlayer = useMemo(() => {
+    if (!players.length) return undefined
+    if (!currentPlayerId) return players[0]
+    return players.find(p => p.id === currentPlayerId) || players[0]
+  }, [players, currentPlayerId])
+
+  const stage = useMemo(() => computeStageLayout(containerSize, natural), [containerSize, natural])
+
+  // Track container resize (responsive)
   useEffect(() => {
-    const img = imgRef.current
-    if (!img) return
+    const el = containerRef.current
+    if (!el) return
 
-    const handleImageLoad = () => {
-      // Usa le dimensioni reali dell"immagine visualizzata
-      const rect = img.getBoundingClientRect()
-      setImageDimensions({
-        width: rect.width,
-        height: rect.height,
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight
-      })
-      console.log(`Immagine caricata: display=${rect.width}x${rect.height}, naturale=${img.naturalWidth}x${img.naturalHeight}`)
-    }
+    const ro = new ResizeObserver(entries => {
+      const entry = entries[0]
+      if (!entry) return
+      const cr = entry.contentRect
+      setContainerSize({ w: cr.width, h: cr.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
-    if (img.complete) {
-      handleImageLoad()
-    } else {
-      img.addEventListener("load", handleImageLoad)
-      return () => img.removeEventListener("load", handleImageLoad)
-    }
+  // When level changes, reset clicks
+  useEffect(() => {
+    setClickPositions([])
   }, [level])
 
-  const handleClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!currentPlayer) return
-
-    const img = e.currentTarget
-    const rect = img.getBoundingClientRect()
-
-    // Calcola le dimensioni effettive dell"immagine renderizzata (con object-fit: contain)
-    const imgAspectRatio = img.naturalWidth / img.naturalHeight
-    const displayAspectRatio = rect.width / rect.height
-
-    let displayWidth = rect.width
-    let displayHeight = rect.height
-    let offsetX = 0
-    let offsetY = 0
-
-    // Se il rapporto d"aspetto è diverso, c"è padding
-    if (imgAspectRatio > displayAspectRatio) {
-      // Immagine più larga - padding verticale
-      displayHeight = rect.width / imgAspectRatio
-      offsetY = (rect.height - displayHeight) / 2
-    } else {
-      // Immagine più stretta - padding orizzontale
-      displayWidth = rect.height * imgAspectRatio
-      offsetX = (rect.width - displayWidth) / 2
-    }
-
-    // Click relativo all"immagine visualizzata (senza padding)
-    const clickX = e.clientX - rect.left - offsetX
-    const clickY = e.clientY - rect.top - offsetY
-
-    // Scala le coordinate dalla dimensione visualizzata alla dimensione originale
-    const scaleX = img.naturalWidth / displayWidth
-    const scaleY = img.naturalHeight / displayHeight
-    
-    const originalX = clickX * scaleX
-    const originalY = clickY * scaleY
-
-    console.log(`Click visualizzato: x=${clickX.toFixed(2)}, y=${clickY.toFixed(2)}`)
-    console.log(`Dimensioni container: ${rect.width}x${rect.height}, Dimensioni immagine effettive: ${displayWidth}x${displayHeight}, Offset: ${offsetX}, ${offsetY}`)
-    console.log(`Dimensioni naturali: ${img.naturalWidth}x${img.naturalHeight}`)
-    console.log(`Scale factors: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`)
-    console.log(`Click originale (scaled): x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}`)
-
-    setClickPositions([...clickPositions, { x: originalX, y: originalY, playerId: currentPlayer.id }])
-    onPhotoClick(originalX, originalY, currentPlayer.id)
+  const handleImgLoad = () => {
+    const img = imgRef.current
+    if (!img) return
+    setNatural({ w: img.naturalWidth, h: img.naturalHeight })
   }
 
-  // Converte i punti del poligono a stringa SVG path
+  const handleStageClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!currentPlayer) return
+    if (natural.w <= 0 || natural.h <= 0) return
+
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return
+
+    const rx = e.clientX - rect.left
+    const ry = e.clientY - rect.top
+
+    // Ignora click fuori dall'area reale dell'immagine
+    if (rx < 0 || ry < 0 || rx > rect.width || ry > rect.height) return
+
+    const x = (rx / rect.width) * natural.w
+    const y = (ry / rect.height) * natural.h
+
+    setClickPositions(prev => [...prev, { x, y, playerId: currentPlayer.id }])
+    onPhotoClick(x, y, currentPlayer.id)
+  }
+
   const polygonToPath = (polygon: Polygon): string => {
     return polygon.points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z"
   }
 
-  // Calcola il bounding box del poligono per posizionare la label
   const getPolygonCenter = (polygon: Polygon) => {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity
     polygon.points.forEach(p => {
       minX = Math.min(minX, p.x)
       maxX = Math.max(maxX, p.x)
       minY = Math.min(minY, p.y)
       maxY = Math.max(maxY, p.y)
     })
-    return {
-      x: (minX + maxX) / 2,
-      y: (minY + maxY) / 2,
-      width: maxX - minX,
-      height: maxY - minY
-    }
+    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
   }
+
+  const cursorSvg = useMemo(() => {
+    const color = encodeURIComponent(currentPlayer?.cursorColor || "#000")
+    return `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><circle cx='16' cy='16' r='6' fill='${color}'/></svg>") 16 16, auto`
+  }, [currentPlayer?.cursorColor])
 
   return (
     <div
       ref={containerRef}
       className="photo-board"
-      style={{
-        cursor: `url("data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"6\" fill=\"${currentPlayer?.cursorColor || "#000"}\"/></svg>") 16 16, auto`,
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        overflow: "hidden"
-      }}
+      style={{ cursor: cursorSvg }}
     >
-      {/* Immagine del livello */}
-      <img
-        ref={imgRef}
-        src={`/images/level${level}.jpeg`}
-        alt={`Level ${level}`}
-        onClick={handleClick}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center",
-          display: "block",
-          cursor: `url("data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><circle cx=\"16\" cy=\"16\" r=\"6\" fill=\"${currentPlayer?.cursorColor || "#000"}\"/></svg>") 16 16, auto`
-        }}
-      />
-
-      {/* SVG per disegnare i poligoni - scalati alle coordinate originali */}
-      <svg 
-        className="polygon-overlay" 
-        style={{ 
-          position: "absolute", 
-          top: 0, 
-          left: 0, 
-          width: imageDimensions.naturalWidth || "100%", 
-          height: imageDimensions.naturalHeight || "100%",
-          pointerEvents: "none"
-        }}
-        viewBox={`0 0 ${imageDimensions.naturalWidth} ${imageDimensions.naturalHeight}`}
+      <div
+        ref={stageRef}
+        className="photo-board__stage"
+        onClick={handleStageClick}
+        style={{ left: stage.left, top: stage.top, width: stage.w, height: stage.h, cursor: cursorSvg }}
       >
-        {(showSolution) && andrews.map(andrea => (
-          <g key={`polygon-${andrea.id}`}>
-            <path
-              d={polygonToPath(andrea.polygon)}
-              className="andrea-polygon"
-              fill="rgba(255, 107, 107, 0.2)"
-              stroke="#FF6B6B"
-              strokeWidth="3"
-            />
-          </g>
-        ))}
-      </svg>
-
-      {/* Label dei poligoni */}
-      {showSolution && andrews.map(andrea => {
-        const center = getPolygonCenter(andrea.polygon)
-        return (
-          <div
-            key={`label-${andrea.id}`}
-            className="andrea-label"
-            style={{
-              left: `${center.x}px`,
-              top: `${center.y}px`,
-              transform: "translate(-50%, -50%)"
-            }}
-          >
-            Andrea {andrea.id}
-          </div>
-        )
-      })}
-
-      {/* Visual feedback dei click */}
-      {clickPositions.map((pos, idx) => (
-        <div
-          key={idx}
-          className="click-marker"
-          style={{
-            left: `${pos.x}px`,
-            top: `${pos.y}px`,
-            borderColor: players.find(p => p.id === pos.playerId)?.cursorColor,
-            backgroundColor: players.find(p => p.id === pos.playerId)?.cursorColor + "20"
-          }}
+        <img
+          ref={imgRef}
+          className="photo-board__img"
+          src={`/images/level${level}.jpeg`}
+          alt={`Level ${level}`}
+          onLoad={handleImgLoad}
+          draggable={false}
         />
-      ))}
 
-      {/* Current player indicator */}
+        {natural.w > 0 && natural.h > 0 && (
+          <svg
+            className="polygon-overlay"
+            viewBox={`0 0 ${natural.w} ${natural.h}`}
+            preserveAspectRatio="none"
+          >
+            {showSolution &&
+              andrews.map(andrea => (
+                <path
+                  key={`polygon-${andrea.id}`}
+                  d={polygonToPath(andrea.polygon)}
+                  className="andrea-polygon"
+                  fill="rgba(255, 107, 107, 0.2)"
+                  stroke="#FF6B6B"
+                  strokeWidth="3"
+                />
+              ))}
+          </svg>
+        )}
+
+        {showSolution && natural.w > 0 && natural.h > 0 &&
+          andrews.map(andrea => {
+            const c = getPolygonCenter(andrea.polygon)
+            return (
+              <div
+                key={`label-${andrea.id}`}
+                className="andrea-label"
+                style={{
+                  left: `${(c.x / natural.w) * 100}%`,
+                  top: `${(c.y / natural.h) * 100}%`,
+                  transform: "translate(-50%, -50%)"
+                }}
+              >
+                Andrea {andrea.id}
+              </div>
+            )
+          })}
+
+        {natural.w > 0 && natural.h > 0 &&
+          clickPositions.map((pos, idx) => {
+            const player = players.find(p => p.id === pos.playerId)
+            return (
+              <div
+                key={idx}
+                className="click-marker"
+                style={{
+                  left: `${(pos.x / natural.w) * 100}%`,
+                  top: `${(pos.y / natural.h) * 100}%`,
+                  borderColor: player?.cursorColor,
+                  backgroundColor: (player?.cursorColor || "#4a90e2") + "20"
+                }}
+              />
+            )
+          })}
+      </div>
+
       {currentPlayer && (
         <div className="current-player-badge" style={{ color: currentPlayer.cursorColor }}>
           {currentPlayer.name}

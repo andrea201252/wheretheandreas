@@ -100,7 +100,7 @@
   font-size: 0.9rem;
 }
 
-.back-button {
+.game-back-button {
   padding: 0.6rem 1.2rem;
   font-size: 0.95rem;
   background: rgba(255, 255, 255, 0.2);
@@ -113,7 +113,7 @@
   width: auto;
 }
 
-.back-button:hover {
+.game-back-button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.05);
 }

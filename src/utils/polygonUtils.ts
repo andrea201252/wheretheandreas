@@ -1,4 +1,4 @@
-// Algoritmo Ray Casting per verificare se un punto è dentro un poligono
+// Algoritmo Ray Casting per verificare se un punto Ã¨ dentro un poligono
 export interface Point {
   x: number
   y: number
@@ -8,7 +8,7 @@ export interface Polygon {
   points: Point[]
 }
 
-// Verifica se un punto è dentro un poligono usando ray casting algorithm
+// Verifica se un punto Ã¨ dentro un poligono usando ray casting algorithm
 export const isPointInPolygon = (point: Point, polygon: Polygon): boolean => {
   const { x, y } = point
   const points = polygon.points
@@ -33,8 +33,8 @@ export const rectangleToPolygon = (x: number, y: number, width: number, height: 
     points: [
       { x, y },
       { x: x + width, y },
-      { x: x + width, y: height },
-      { x, y: height }
+      { x: x + width, y: y + height },
+      { x, y: y + height }
     ]
   }
 }

@@ -206,7 +206,7 @@ export default function GameScreen({ level, players, gameId, onComplete, onBackT
             ))}
           </div>
         </div>
-        <button onClick={onBackToIntro} className="back-button">
+        <button onClick={onBackToIntro} className="game-back-button">
            Back
         </button>
       </div>

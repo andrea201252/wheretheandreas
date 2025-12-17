@@ -22,7 +22,7 @@ export default function IntroScreen({ onStart }: IntroScreenProps) {
         <p className="intro-description">
           Find the two Andreas hidden in the photo!
         </p>
-        <button onClick={onStart} className="start-button">
+        <button onClick={onStart} className="intro-start-button">
           Start Game
         </button>
       </div>

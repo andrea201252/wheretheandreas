@@ -13,7 +13,7 @@ export default function LevelIntroScreen({ level, onStart, onBack }: LevelIntroS
 
   return (
     <div className="level-intro-screen" style={{backgroundImage: `url('${getIntroImage()}')` }}>
-      <button onClick={onBack} className="back-button">
+      <button onClick={onBack} className="level-back-button">
          Back
       </button>
       
@@ -36,7 +36,7 @@ export default function LevelIntroScreen({ level, onStart, onBack }: LevelIntroS
             </ul>
           </div>
           
-          <button onClick={onStart} className="start-button">
+          <button onClick={onStart} className="level-start-button">
             Start Level {level}
           </button>
         </div>

@@ -106,7 +106,7 @@
   font-weight: 500;
 }
 
-.start-button {
+.intro-start-button {
   padding: 1.2rem 3rem;
   font-size: 1.3rem;
   font-weight: bold;
@@ -119,12 +119,12 @@
   box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
 }
 
-.start-button:hover {
+.intro-start-button:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 20px rgba(74, 144, 226, 0.6);
   background: linear-gradient(135deg, #5ba3f5 0%, #3b7dd9 100%);
 }
 
-.start-button:active {
+.intro-start-button:active {
   transform: translateY(-1px);
 }

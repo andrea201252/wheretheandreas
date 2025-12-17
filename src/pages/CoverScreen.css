@@ -34,7 +34,7 @@
   }
 }
 
-.back-button {
+.cover-back-button {
   position: absolute;
   top: 20px;
   right: 20px;
@@ -51,12 +51,12 @@
   z-index: 10;
 }
 
-.back-button:hover {
+.cover-back-button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.05);
 }
 
-.back-button:active {
+.cover-back-button:active {
   transform: scale(0.98);
 }
 
@@ -68,7 +68,7 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
-.start-button {
+.cover-start-button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
@@ -85,12 +85,12 @@
   display: inline-block;
 }
 
-.start-button:hover {
+.cover-start-button:hover {
   transform: scale(1.05);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
 }
 
-.start-button:active {
+.cover-start-button:active {
   transform: scale(0.98);
 }
 

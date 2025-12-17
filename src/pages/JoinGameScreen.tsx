@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import './JoinGameScreen.css'
 
 interface JoinGameScreenProps {
@@ -22,7 +22,7 @@ export default function JoinGameScreen({ onJoinGame, onBackToMode }: JoinGameScr
     onJoinGame(gameId.toUpperCase())
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleJoin()
     }
@@ -55,7 +55,7 @@ export default function JoinGameScreen({ onJoinGame, onBackToMode }: JoinGameScr
             <button onClick={handleJoin} className="join-button">
               Join Game ✓
             </button>
-            <button onClick={onBackToMode} className="back-button">
+            <button onClick={onBackToMode} className="join-back-button">
               Back ← 
             </button>
           </div>

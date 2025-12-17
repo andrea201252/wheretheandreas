@@ -91,7 +91,7 @@
   transform: translateY(0);
 }
 
-.back-button {
+.join-back-button {
   background: #e0e0e0;
   color: #333;
   border: none;
@@ -103,7 +103,7 @@
   transition: all 0.3s ease;
 }
 
-.back-button:hover {
+.join-back-button:hover {
   background: #d0d0d0;
 }
 

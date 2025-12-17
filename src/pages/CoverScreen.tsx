@@ -9,12 +9,12 @@ export default function CoverScreen({ onComplete, onBack }: CoverScreenProps) {
   return (
     <div className="cover-screen">
       {onBack && (
-        <button onClick={onBack} className="back-button">
+        <button onClick={onBack} className="cover-back-button">
           Back
         </button>
       )}
       <img src="/images/Copertina.png" alt="Cover" className="cover-image" />
-      <button onClick={() => onComplete(true)} className="start-button">
+      <button onClick={() => onComplete(true)} className="cover-start-button">
         Start Game
       </button>
       <button onClick={() => onComplete(true)} className="skip-button">
